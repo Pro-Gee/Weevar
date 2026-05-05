@@ -1,0 +1,18 @@
+{
+  "name": "weevar-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w weevar",
+    "dev": "npm run dev -w playground",
+    "test": "npm run test -w weevar",
+    "test:e2e": "playwright test",
+    "bench": "npm run bench -w weevar"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
+  }
+}

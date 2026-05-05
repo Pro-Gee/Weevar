@@ -1,0 +1,77 @@
+{
+  "name": "weevar",
+  "version": "0.0.1",
+  "description": "Dev overlay: manipulate live UI and copy structured prompts for AI assistants",
+  "license": "MIT",
+  "sideEffects": false,
+  "main": "./dist/react.prod.js",
+  "module": "./dist/react.prod.mjs",
+  "types": "./dist/react.prod.d.ts",
+  "exports": {
+    "./react": {
+      "development": {
+        "types": "./dist/react.dev.d.ts",
+        "import": "./dist/react.dev.mjs",
+        "require": "./dist/react.dev.js"
+      },
+      "default": {
+        "types": "./dist/react.prod.d.ts",
+        "import": "./dist/react.prod.mjs",
+        "require": "./dist/react.prod.js"
+      }
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.mjs",
+      "require": "./dist/vite.js"
+    },
+    "./swc": {
+      "types": "./dist/swc.d.ts",
+      "import": "./dist/swc.mjs",
+      "require": "./dist/swc.js"
+    },
+    "./webpack-loader": {
+      "types": "./dist/webpack-loader.d.ts",
+      "import": "./dist/webpack-loader.mjs",
+      "require": "./dist/webpack-loader.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0",
+    "@swc/core": ">=1.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@swc/core": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-react": "^7.26.3",
+    "@babel/preset-typescript": "^7.26.0",
+    "@babel/types": "^7.26.3"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.15.33",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "jsdom": "^25.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.6"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "bench": "vitest bench --run"
+  }
+}
