@@ -70,15 +70,22 @@ export function Weevar(props: WeevarProps) {
     if (existingHost) {
       const owner = existingHost.getAttribute(WEEVAR_HOST_OWNER_ATTR);
       if (owner && owner !== WEEVAR_HOST_OWNER_TOKEN) {
-        if (import.meta.env.DEV && !warnedAboutForeignHostOwner) {
-          warnedAboutForeignHostOwner = true;
-          console.warn(
-            "[weevar] Existing overlay host is owned by another instance; skipping host takeover.",
-          );
+        // During dev HMR/replay flows, an older Weevar instance can leave a host behind.
+        // Reclaim only Weevar-owned hosts to avoid removing foreign DOM accidentally.
+        if (owner.startsWith("weevar-")) {
+          existingHost.remove();
+        } else {
+          if (import.meta.env.DEV && !warnedAboutForeignHostOwner) {
+            warnedAboutForeignHostOwner = true;
+            console.warn(
+              "[weevar] Existing overlay host is owned by another instance; skipping host takeover.",
+            );
+          }
+          return false;
         }
-        return false;
+      } else {
+        existingHost.remove();
       }
-      existingHost.remove();
     }
 
     const host = document.createElement("div");

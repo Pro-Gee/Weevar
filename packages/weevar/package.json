@@ -1,8 +1,28 @@
 {
   "name": "weevar",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Dev overlay: manipulate live UI and copy structured prompts for AI assistants",
+  "homepage": "https://weevar.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/weevar/weevar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/weevar/weevar/issues"
+  },
   "license": "MIT",
+  "keywords": [
+    "ui",
+    "overlay",
+    "ai",
+    "prompt",
+    "react",
+    "vite",
+    "developer-tools"
+  ],
+  "engines": {
+    "node": ">=18.18"
+  },
   "sideEffects": false,
   "main": "./dist/react.prod.js",
   "module": "./dist/react.prod.mjs",
@@ -40,9 +60,9 @@
     "dist"
   ],
   "peerDependencies": {
+    "@swc/core": ">=1.3.0",
     "react": ">=17.0.0",
-    "react-dom": ">=17.0.0",
-    "@swc/core": ">=1.3.0"
+    "react-dom": ">=17.0.0"
   },
   "peerDependenciesMeta": {
     "@swc/core": {
@@ -65,13 +85,18 @@
     "react-dom": "^18.3.1",
     "tsup": "^8.3.5",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11",
-    "vitest": "^2.1.6"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
-    "bench": "vitest bench --run"
+    "bench": "vitest bench --run",
+    "verify": "npm run build && npm run test",
+    "prepublishOnly": "npm run verify"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

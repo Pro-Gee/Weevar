@@ -9,8 +9,11 @@
     "build": "npm run build -w weevar",
     "dev": "npm run dev -w playground",
     "test": "npm run test -w weevar",
+    "test:e2e:setup": "playwright install chromium",
     "test:e2e": "playwright test",
-    "bench": "npm run bench -w weevar"
+    "bench": "npm run bench -w weevar",
+    "verify": "npm run build && npm run test && npm run test:e2e:setup && npm run test:e2e",
+    "release:check": "npm run verify && npm pack -w weevar --dry-run"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1"
