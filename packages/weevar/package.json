@@ -1,14 +1,14 @@
 {
   "name": "weevar",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Dev overlay: manipulate live UI and copy structured prompts for AI assistants",
   "homepage": "https://weevar.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/weevar/weevar.git"
+    "url": "https://github.com/Pro-Gee/Weevar.git"
   },
   "bugs": {
-    "url": "https://github.com/weevar/weevar/issues"
+    "url": "https://github.com/Pro-Gee/Weevar/issues"
   },
   "license": "MIT",
   "keywords": [

@@ -45,7 +45,7 @@ Run your dev server and press **⌘⇧E** (Mac) or **Ctrl+Shift+E** (Windows/Lin
 - **Node.js** `>= 18.18`
 - A **React** app (`react` / `react-dom` **>= 17**)
 - **Development mode** (run your usual dev server—e.g. Vite, Next dev—not a production build)
-- **Bundler integration** is recommended for the best experience (see **Vite** below); other setups may need extra configuration—see the [Install](https://github.com/weevar/weevar/blob/main/docs/INSTALL.md) guide.
+- **Bundler integration** is recommended for the best experience (see **Vite** below); other setups may need extra configuration—see the [Install](https://github.com/Pro-Gee/Weevar/blob/main/docs/INSTALL.md) guide.
 
 ## How it works
 
@@ -54,9 +54,7 @@ Run your dev server and press **⌘⇧E** (Mac) or **Ctrl+Shift+E** (Windows/Lin
 3. Click and drag elements to rearrange them.
 4. See the layout update instantly.
 
-When you’re done, the tool generates a prompt—for example:
-
-> Move the CTA button below the feature list and keep spacing consistent across all cards.
+When you’re done, the tool generates a prompt.
 
 Paste that into your AI coding tool, and it updates your code.
 
@@ -82,11 +80,12 @@ Instead of describing it, you move things directly and let Weevar translate that
 
 Full guides live in the repository:
 
-- [Install](https://github.com/weevar/weevar/blob/main/docs/INSTALL.md)
-- [Usage](https://github.com/weevar/weevar/blob/main/docs/USAGE.md)
-- [Troubleshooting](https://github.com/weevar/weevar/blob/main/docs/TROUBLESHOOTING.md)
-- [Compatibility](https://github.com/weevar/weevar/blob/main/docs/COMPATIBILITY.md)
-- [Security](https://github.com/weevar/weevar/blob/main/docs/SECURITY.md)
+- [Install](https://github.com/Pro-Gee/Weevar/blob/main/docs/INSTALL.md)
+- [Usage](https://github.com/Pro-Gee/Weevar/blob/main/docs/USAGE.md)
+- [Troubleshooting](https://github.com/Pro-Gee/Weevar/blob/main/docs/TROUBLESHOOTING.md)
+- [Compatibility](https://github.com/Pro-Gee/Weevar/blob/main/docs/COMPATIBILITY.md)
+- [Security](https://github.com/Pro-Gee/Weevar/blob/main/docs/SECURITY.md)
+- [Weevar.com](https://weevar.com)
 
 ## License
 

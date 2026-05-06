@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-05-07
+
+### Changed
+
+- Expanded npm/readme product narrative, requirements, and workflow description.
+- Point GitHub documentation links and `repository` / `bugs` URLs at the real repo (`Pro-Gee/Weevar`).
+
 ## [1.0.1] - 2026-05-06
 
 ### Added
