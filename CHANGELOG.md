@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-05-06
+
+### Added
+
+- Tray footer version label derived from `packages/weevar/package.json` at build time (`tsup` / Vitest); playground dev injects the same via Vite `define`.
+- MIT `LICENSE` at repo root and under `packages/weevar` so the registry tarball includes license text.
+
+### Fixed
+
+- Ship `packages/weevar/README.md` in the npm tarball so the npm package page shows install and usage documentation.
+- Playground E2E expectations aligned with current playground UI and documentation button behavior.
+
 ## [1.0.0] - 2026-05-06
 
 ### Added

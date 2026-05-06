@@ -1,4 +1,10 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "tsup";
+
+const packageDir = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")) as { version: string };
 
 export default defineConfig({
   entry: {
@@ -41,6 +47,7 @@ export default defineConfig({
       "process.env.NODE_ENV": JSON.stringify(
         process.env.NODE_ENV ?? "development",
       ),
+      __WEEVAR_VERSION__: JSON.stringify(pkg.version),
     };
   },
 });

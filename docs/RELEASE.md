@@ -12,7 +12,7 @@
 ## Package validation
 
 - [ ] `npm pack -w weevar --dry-run`
-- [ ] Validate tarball includes only expected files (`dist`, docs as intended)
+- [ ] Validate tarball includes only expected files: `dist/**`, `packages/weevar/README.md`, `packages/weevar/LICENSE`, `package.json` (`npm pack -w weevar --dry-run`)
 - [ ] Confirm export paths resolve: `react`, `vite`, `swc`, `webpack-loader`
 
 ## Versioning and notes

@@ -43,6 +43,7 @@ import {
   parentSupportsFlexOrderPreview,
 } from "../engine/reorderTarget";
 import { resolveElementIdentity } from "../engine/resolveIdentity";
+import { weevarVersionLabel } from "../version";
 import { OVERLAY_CSS } from "./overlayStyles";
 import { PromptPanel } from "./PromptPanel";
 
@@ -1862,7 +1863,7 @@ body *:focus {
                       ) : null}
                     </div>
                     <div className="wv-tray-foot">
-                      <span>v1.0.0</span>
+                      <span>{weevarVersionLabel()}</span>
                       <GlobeIcon />
                     </div>
                   </aside>
@@ -2132,7 +2133,7 @@ function SettingsTray({
       </div>
 
       <div className="wv-tray-foot wv-settings-foot">
-        <span>v1.0.0</span>
+        <span>{weevarVersionLabel()}</span>
         <GlobeIcon />
       </div>
     </aside>

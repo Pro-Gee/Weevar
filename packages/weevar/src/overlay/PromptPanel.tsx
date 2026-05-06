@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { WeevarRuntimeConfig } from "../engine/layoutTypes";
+import { weevarVersionLabel } from "../version";
 
 type Props = {
   promptText: string;
@@ -104,7 +105,7 @@ export function PromptPanel({
         {warningNote ? <div className="wv-panel-note">{warningNote}</div> : null}
       </div>
       <div className="wv-tray-foot">
-        <span>v1.0.0</span>
+        <span>{weevarVersionLabel()}</span>
         <GlobeIcon />
       </div>
     </aside>
