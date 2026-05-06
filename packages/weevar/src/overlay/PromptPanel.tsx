@@ -1,162 +1,184 @@
-import type {
-  GeneratedPrompt,
-  LayoutChange,
-  PromptLength,
-  TargetTool,
-  WeevarRuntimeConfig,
-} from "../engine/layoutTypes";
-import { reorderImmutable } from "../engine/reorderTarget";
-import { promptBody } from "../engine/prompts";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import type { WeevarRuntimeConfig } from "../engine/layoutTypes";
 
 type Props = {
-  change: LayoutChange;
-  prompt: GeneratedPrompt;
-  promptLen: PromptLength;
+  promptText: string;
+  canCopy: boolean;
   runtimeConfig?: WeevarRuntimeConfig;
-  onPromptLen: (v: PromptLength) => void;
-  tool: TargetTool;
-  onTool: (v: TargetTool) => void;
   onCopy: () => void | Promise<void>;
-  onRegenerate: () => void;
-  onDiscard: () => void;
+  onClose: () => void;
+  warningNote?: string | null;
   copyFlash: boolean;
+  style?: CSSProperties;
+  /** When stacked with other trays, hide from a11y tree while off-screen */
+  hidden?: boolean;
 };
 
 export function PromptPanel({
-  change,
-  prompt,
-  promptLen,
+  promptText,
+  canCopy,
   runtimeConfig: _runtimeConfig,
-  onPromptLen,
-  tool,
-  onTool,
   onCopy,
-  onRegenerate,
-  onDiscard,
+  onClose,
+  warningNote,
   copyFlash,
+  style,
+  hidden = false,
 }: Props) {
   void _runtimeConfig; // reserved for future panel-local template hooks
-  const header =
-    change.kind === "reorder"
-      ? `Reorder within <${change.parent.label || change.parent.tag}>`
-      : `Move into <${change.toParent.label || change.toParent.tag}>`;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollThumb, setScrollThumb] = useState<{ top: number; height: number; visible: boolean }>({
+    top: 0,
+    height: 0,
+    visible: false,
+  });
 
-  const body = promptBody(prompt, promptLen);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const client = el.clientHeight;
+      const scroll = el.scrollHeight;
+      const maxScroll = scroll - client;
+      if (maxScroll <= 0 || client <= 0) {
+        setScrollThumb({ top: 0, height: 0, visible: false });
+        return;
+      }
+      const trackInset = 10;
+      const trackHeight = Math.max(0, client - trackInset * 2);
+      const height = Math.max(20, (client / scroll) * trackHeight);
+      const ratio = el.scrollTop / maxScroll;
+      const travel = Math.max(0, trackHeight - height);
+      const top = trackInset + ratio * travel;
+      setScrollThumb({ top, height, visible: true });
+    };
+
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      el.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [promptText, copyFlash]);
 
   return (
-    <aside className="wv-prompt-drawer wv-pe" role="dialog" aria-label="Generated prompt">
-      <div className="wv-prompt-header">{header}</div>
-      <div className="wv-schematic" aria-hidden>
-        <Schematic change={change} />
-      </div>
-      <div className="wv-tabs">
-        <button
-          type="button"
-          className={promptLen === "short" ? "wv-tab wv-tab-on" : "wv-tab"}
-          onClick={() => onPromptLen("short")}
-        >
-          Short
-        </button>
-        <button
-          type="button"
-          className={promptLen === "detailed" ? "wv-tab wv-tab-on" : "wv-tab"}
-          onClick={() => onPromptLen("detailed")}
-        >
-          Detailed
+    <aside
+      className="wv-prompt-drawer wv-pe"
+      role="dialog"
+      aria-label="Generated prompt"
+      style={style}
+      aria-hidden={hidden}
+    >
+      <div className="wv-tray-head">
+        <PromptLogo />
+        <button type="button" className="wv-tray-hide-btn" aria-label="Hide tray" onClick={onClose}>
+          <HideTrayIcon />
         </button>
       </div>
-      <pre className="wv-prompt-body">{body}</pre>
-      <label className="wv-field">
-        <span>Target</span>
-        <select
-          className="wv-select"
-          value={tool}
-          onChange={(e) => onTool(e.target.value as TargetTool)}
+      <div className="wv-tray-content wv-prompt-content">
+        <div className="wv-prompt-card">
+          <div ref={scrollRef} className="wv-prompt-card-scroll">
+            <div className="wv-prompt-card-title">Prompt</div>
+            <pre className="wv-prompt-card-body">{promptText}</pre>
+          </div>
+          {scrollThumb.visible ? (
+            <div className="wv-prompt-scrollbar" aria-hidden>
+              <div
+                className="wv-prompt-scrollbar-thumb"
+                style={{ top: scrollThumb.top, height: scrollThumb.height }}
+              />
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className={`wv-prompt-copy-btn ${copyFlash ? "wv-prompt-copy-btn-on" : ""}`}
+          onClick={() => void onCopy()}
+          disabled={!canCopy}
         >
-          <option value="claude-code">Claude Code</option>
-          <option value="codex">Codex</option>
-          <option value="generic">Generic</option>
-        </select>
-      </label>
-      <div className="wv-prompt-actions">
-        <button type="button" className="wv-btn wv-btn-primary" onClick={() => void onCopy()}>
-          {copyFlash ? "Copied" : "Copy"}
+          {copyFlash ? <CopySuccessIcon /> : <CopyIcon />}
+          <span>{copyFlash ? "Copied" : "Copy"}</span>
         </button>
-        <button type="button" className="wv-btn" onClick={onRegenerate}>
-          Regenerate
-        </button>
-        <button type="button" className="wv-btn wv-btn-danger" onClick={onDiscard}>
-          Discard
-        </button>
+        {warningNote ? <div className="wv-panel-note">{warningNote}</div> : null}
+      </div>
+      <div className="wv-tray-foot">
+        <span>v1.0.0</span>
+        <GlobeIcon />
       </div>
     </aside>
   );
 }
 
-function Schematic({ change }: { change: LayoutChange }) {
-  if (change.kind === "reorder") {
-    const from = change.fromIndex;
-    const to = change.toIndex;
-    const after = change.siblings;
-    const before = reorderImmutable(after, to, from);
-    return (
-      <div className="wv-schematic-inner">
-        <div className="wv-schematic-col">
-          <div className="wv-schematic-title">Before</div>
-          <div className="wv-schematic-row">
-            {before.map((s, i) => (
-              <div
-                key={`b-${i}-${s.label}`}
-                className={
-                  i === from ? "wv-schematic-cell wv-schematic-hot" : "wv-schematic-cell"
-                }
-                title={s.label}
-              >
-                {i + 1}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="wv-schematic-arrow">→</div>
-        <div className="wv-schematic-col">
-          <div className="wv-schematic-title">After</div>
-          <div className="wv-schematic-row">
-            {after.map((s, i) => (
-              <div
-                key={`a-${i}-${s.label}`}
-                className={
-                  i === to ? "wv-schematic-cell wv-schematic-hot" : "wv-schematic-cell"
-                }
-                title={s.label}
-              >
-                {i + 1}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+function PromptLogo() {
   return (
-    <div className="wv-schematic-inner">
-      <div className="wv-schematic-col">
-        <div className="wv-schematic-title">From</div>
-        <div className="wv-schematic-row">
-          <div className="wv-schematic-cell wv-schematic-hot" title={change.fromParent.label}>
-            {change.fromParent.componentName || change.fromParent.tag}
-          </div>
-        </div>
-      </div>
-      <div className="wv-schematic-arrow">→</div>
-      <div className="wv-schematic-col">
-        <div className="wv-schematic-title">To</div>
-        <div className="wv-schematic-row">
-          <div className="wv-schematic-cell wv-schematic-hot" title={change.toParent.label}>
-            {change.toParent.componentName || change.toParent.tag}
-          </div>
-        </div>
-      </div>
-    </div>
+    <svg
+      className="wv-tray-logo"
+      width="48"
+      height="10"
+      viewBox="0 0 48 10"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="Weevar"
+    >
+      <path d="M2.16888 9.97264C1.66872 9.97264 1.2504 9.76288 0.913931 9.34336C0.577459 8.92385 0.409223 8.34929 0.409223 7.6197C0.409223 7.24578 0.450145 6.82627 0.531989 6.36115C0.613834 5.88691 0.709319 5.40812 0.818445 4.92476C0.927571 4.4414 1.02306 3.98997 1.1049 3.57045C1.18675 3.14181 1.22767 2.78614 1.22767 2.50342C1.22767 2.30278 1.20039 2.14774 1.14582 2.0383C1.09126 1.91974 0.991228 1.86047 0.845727 1.86047C0.736601 1.86047 0.609287 1.91062 0.463786 2.01094C0.318284 2.11126 0.209158 2.30734 0.136408 2.59918L0 2.54446C0 1.76015 0.17733 1.13999 0.531989 0.683995C0.895743 0.227998 1.38226 0 1.99155 0C2.56446 0 2.96004 0.186959 3.1783 0.560876C3.40564 0.934793 3.51931 1.40447 3.51931 1.9699C3.51931 2.38942 3.47385 2.8363 3.38291 3.31053C3.30106 3.78477 3.20558 4.25901 3.09645 4.73324C2.98733 5.19836 2.88729 5.63155 2.79635 6.03283C2.71451 6.43411 2.67359 6.76699 2.67359 7.03146C2.67359 7.42362 2.77362 7.6197 2.97368 7.6197C3.0919 7.6197 3.25105 7.53762 3.45111 7.37346C3.65118 7.20018 3.86033 6.96762 4.07859 6.67579C4.30593 6.37483 4.52418 6.03739 4.73334 5.66347C4.9425 5.28044 5.11983 4.87916 5.26533 4.45964C5.24714 4.25901 5.2335 4.06749 5.22441 3.88509C5.21531 3.69357 5.21077 3.52485 5.21077 3.37893C5.21077 2.64934 5.27897 2.0611 5.41538 1.61423C5.56088 1.16735 5.74276 0.839033 5.96101 0.629275C6.17926 0.419517 6.40206 0.314637 6.62941 0.314637C6.94769 0.314637 7.23415 0.492476 7.48877 0.848153C7.7434 1.19471 7.87072 1.66895 7.87072 2.27086C7.87072 2.64478 7.80251 3.0643 7.6661 3.52941C7.5297 3.98541 7.30235 4.47332 6.98407 4.99316C6.95678 5.77747 7.04318 6.41131 7.24324 6.89466C7.44331 7.37802 7.69339 7.6197 7.99348 7.6197C8.18445 7.6197 8.38906 7.52394 8.60732 7.33242C8.83466 7.13178 9.04382 6.85819 9.23479 6.51163C9.42576 6.15595 9.58036 5.74555 9.69858 5.28044C9.82589 4.81532 9.88955 4.31829 9.88955 3.78933C9.88955 3.47925 9.86681 3.15549 9.82134 2.81806C9.78497 2.48062 9.73495 2.15686 9.67129 1.84678C9.61673 1.53671 9.55762 1.28135 9.49396 1.08071C9.49396 0.925672 9.55762 0.770634 9.68494 0.615595C9.82134 0.451437 9.99413 0.314637 10.2033 0.205198C10.4124 0.086639 10.6261 0.0273594 10.8444 0.0273594C11.0627 0.0273594 11.2718 0.104879 11.4719 0.259918C11.6719 0.414957 11.8356 0.688555 11.9629 1.08071C12.0903 1.46375 12.1539 2.01094 12.1539 2.7223C12.1539 3.71637 12.0266 4.65116 11.772 5.52668C11.5173 6.39307 11.1718 7.15914 10.7353 7.8249C10.3079 8.49065 9.83498 9.01505 9.31663 9.39808C8.79829 9.772 8.27084 9.95896 7.73431 9.95896C7.26143 9.95896 6.87039 9.81304 6.5612 9.5212C6.25201 9.22937 6.01103 8.83721 5.83824 8.34473C5.66546 7.85226 5.54269 7.30506 5.46994 6.70315C5.14256 7.48746 4.7879 8.12129 4.40596 8.60465C4.02402 9.07889 3.64208 9.42544 3.26014 9.64432C2.8782 9.8632 2.51445 9.97264 2.16888 9.97264Z" fill="currentColor" />
+      <path d="M15.4244 10C14.7605 10 14.2104 9.86776 13.7739 9.60328C13.3374 9.32969 13.01 8.97401 12.7917 8.53625C12.5735 8.08938 12.4643 7.61058 12.4643 7.09986C12.4643 6.61651 12.5553 6.13315 12.7372 5.64979C12.9281 5.15732 13.2009 4.71044 13.5556 4.30917C13.9194 3.90789 14.3559 3.58413 14.8651 3.33789C15.3835 3.09166 15.9655 2.96854 16.6111 2.96854C17.4114 2.96854 17.9934 3.15093 18.3572 3.51573C18.73 3.87141 18.9164 4.30461 18.9164 4.81532C18.9164 5.25308 18.7982 5.65891 18.5618 6.03283C18.3344 6.39763 18.0298 6.69403 17.6478 6.92202C17.2659 7.1409 16.8476 7.25034 16.3929 7.25034C16.1564 7.25034 15.9155 7.21386 15.6699 7.1409C15.4244 7.06794 15.1834 6.95394 14.947 6.79891C14.9924 7.36434 15.1561 7.77474 15.438 8.0301C15.7199 8.28545 16.0564 8.41313 16.4474 8.41313C16.7203 8.41313 16.9931 8.36297 17.2659 8.26265C17.5387 8.15321 17.7888 8.01642 18.0161 7.85226C18.2526 7.67898 18.4344 7.49658 18.5618 7.30506L18.6572 7.37346C18.6572 7.8477 18.5572 8.25353 18.3572 8.59097C18.1662 8.91929 17.9116 9.18833 17.5933 9.39808C17.275 9.60784 16.9249 9.76288 16.5429 9.8632C16.1701 9.9544 15.7972 10 15.4244 10ZM15.7381 6.30643C16.0291 6.30643 16.2656 6.22435 16.4474 6.06019C16.6293 5.88691 16.7657 5.68627 16.8567 5.45828C16.9476 5.23028 16.9931 5.02964 16.9931 4.85636C16.9931 4.6466 16.934 4.47332 16.8157 4.33653C16.6975 4.19061 16.5338 4.11765 16.3247 4.11765C16.161 4.11765 15.9791 4.17693 15.779 4.29549C15.5881 4.41404 15.4153 4.61924 15.2607 4.91108C15.1061 5.1938 15.0061 5.59052 14.9606 6.10123C15.2516 6.23803 15.5108 6.30643 15.7381 6.30643Z" fill="currentColor" />
+      <path d="M22.5378 10C21.874 10 21.3238 9.86776 20.8873 9.60328C20.4508 9.32969 20.1234 8.97401 19.9052 8.53625C19.6869 8.08938 19.5778 7.61058 19.5778 7.09986C19.5778 6.61651 19.6687 6.13315 19.8506 5.64979C20.0416 5.15732 20.3144 4.71044 20.669 4.30917C21.0328 3.90789 21.4693 3.58413 21.9786 3.33789C22.4969 3.09166 23.0789 2.96854 23.7246 2.96854C24.5248 2.96854 25.1068 3.15093 25.4706 3.51573C25.8434 3.87141 26.0299 4.30461 26.0299 4.81532C26.0299 5.25308 25.9116 5.65891 25.6752 6.03283C25.4479 6.39763 25.1432 6.69403 24.7613 6.92202C24.3793 7.1409 23.961 7.25034 23.5063 7.25034C23.2699 7.25034 23.0289 7.21386 22.7834 7.1409C22.5378 7.06794 22.2968 6.95394 22.0604 6.79891C22.1059 7.36434 22.2696 7.77474 22.5515 8.0301C22.8334 8.28545 23.1698 8.41313 23.5609 8.41313C23.8337 8.41313 24.1065 8.36297 24.3793 8.26265C24.6521 8.15321 24.9022 8.01642 25.1296 7.85226C25.366 7.67898 25.5479 7.49658 25.6752 7.30506L25.7707 7.37346C25.7707 7.8477 25.6707 8.25353 25.4706 8.59097C25.2796 8.91929 25.025 9.18833 24.7067 9.39808C24.3884 9.60784 24.0383 9.76288 23.6564 9.8632C23.2835 9.9544 22.9107 10 22.5378 10ZM22.8516 6.30643C23.1426 6.30643 23.379 6.22435 23.5609 6.06019C23.7428 5.88691 23.8792 5.68627 23.9701 5.45828C24.061 5.23028 24.1065 5.02964 24.1065 4.85636C24.1065 4.6466 24.0474 4.47332 23.9292 4.33653C23.811 4.19061 23.6473 4.11765 23.4381 4.11765C23.2744 4.11765 23.0926 4.17693 22.8925 4.29549C22.7015 4.41404 22.5287 4.61924 22.3741 4.91108C22.2195 5.1938 22.1195 5.59052 22.074 6.10123C22.365 6.23803 22.6242 6.30643 22.8516 6.30643Z" fill="currentColor" />
+      <path d="M28.751 9.95896C28.2235 9.95896 27.8052 9.82216 27.496 9.54856C27.1868 9.26585 27.0322 8.83265 27.0322 8.24897C27.0322 7.91154 27.0732 7.5513 27.155 7.16826C27.246 6.78523 27.3323 6.44323 27.4142 6.14227C27.496 5.85043 27.5597 5.59508 27.6052 5.3762C27.6597 5.15732 27.687 4.9886 27.687 4.87004C27.687 4.72412 27.6552 4.61924 27.5915 4.5554C27.5279 4.49156 27.4506 4.45964 27.3596 4.45964C27.1414 4.45964 26.9595 4.56452 26.814 4.77428L26.7594 4.71956C26.7685 4.40948 26.8686 4.12677 27.0595 3.87141C27.2505 3.60693 27.496 3.39717 27.7961 3.24213C28.0962 3.0871 28.4009 3.00958 28.7101 3.00958C29.0556 3.00958 29.3512 3.11446 29.5967 3.32421C29.8422 3.52485 29.9559 3.84405 29.9377 4.28181C29.9286 4.47332 29.8923 4.715 29.8286 5.00684C29.774 5.29868 29.6967 5.64523 29.5967 6.04651C29.533 6.30187 29.4648 6.59371 29.3921 6.92202C29.3284 7.24122 29.2966 7.53306 29.2966 7.79754C29.2966 7.99818 29.3284 8.15777 29.3921 8.27633C29.4558 8.39489 29.5603 8.45417 29.7058 8.45417C29.8968 8.45417 30.106 8.34929 30.3333 8.13953C30.5697 7.92066 30.7744 7.56954 30.9471 7.08618C31.1199 6.59371 31.22 5.94163 31.2472 5.12996C31.2745 4.5098 31.2336 4.05837 31.1245 3.77565V3.70725C31.2063 3.57957 31.3291 3.45645 31.4928 3.33789C31.6656 3.21933 31.8565 3.12357 32.0657 3.05062C32.2748 2.96854 32.4704 2.9275 32.6522 2.9275C32.9432 2.9275 33.1888 3.06886 33.3888 3.35157C33.598 3.63429 33.6889 4.12677 33.6617 4.829C33.6435 5.50388 33.5207 6.11491 33.2934 6.66211C33.0751 7.2093 32.7886 7.6881 32.434 8.0985C32.0793 8.50889 31.6883 8.85089 31.2609 9.12449C30.8426 9.39808 30.4152 9.60784 29.9786 9.75376C29.5421 9.89056 29.1329 9.95896 28.751 9.95896Z" fill="currentColor" />
+      <path d="M39.2501 9.97264C38.9318 9.97264 38.6545 9.86776 38.418 9.658C38.1816 9.44824 38.0634 9.10625 38.0634 8.63201C38.0634 8.58641 38.0634 8.54081 38.0634 8.49521C38.0634 8.44961 38.0679 8.40401 38.077 8.35841C37.8042 8.90561 37.495 9.31145 37.1494 9.57592C36.8129 9.83128 36.4719 9.95896 36.1264 9.95896C35.8081 9.95896 35.508 9.84952 35.2261 9.63064C34.9442 9.40264 34.7168 9.06977 34.544 8.63201C34.3713 8.19425 34.2849 7.6653 34.2849 7.04514C34.2849 6.40675 34.3713 5.83675 34.544 5.33516C34.7259 4.83356 34.9624 4.40948 35.2534 4.06293C35.5444 3.71637 35.8626 3.45645 36.2082 3.28317C36.5538 3.10078 36.8902 3.00958 37.2176 3.00958C37.5814 3.00958 37.9088 3.12358 38.1998 3.35157C38.4908 3.57045 38.6908 3.92157 38.8 4.40492C38.8272 4.24989 38.8454 4.10853 38.8545 3.98085C38.8727 3.85317 38.8818 3.76653 38.8818 3.72093C38.8909 3.47469 39.0137 3.29229 39.2501 3.17373C39.4956 3.05518 39.7639 2.9959 40.0549 2.9959C40.3095 2.9959 40.5505 3.04606 40.7779 3.14637C41.0052 3.24669 41.1598 3.41541 41.2416 3.65253L41.2689 3.73461C41.1598 3.98085 41.0507 4.27725 40.9415 4.6238C40.8324 4.97036 40.7324 5.33516 40.6415 5.71819C40.5505 6.09211 40.4778 6.46147 40.4232 6.82627C40.3686 7.18194 40.3414 7.49658 40.3414 7.77018C40.3414 8.07114 40.3732 8.28089 40.4368 8.39945C40.5005 8.50889 40.5778 8.56361 40.6687 8.56361C40.8233 8.56361 40.9643 8.45417 41.0916 8.23529L41.2007 8.29001C41.2007 8.60009 41.1007 8.88281 40.9006 9.13817C40.7006 9.39353 40.4505 9.59872 40.1504 9.75376C39.8503 9.89968 39.5502 9.97264 39.2501 9.97264ZM37.0267 8.23529C37.2631 8.23529 37.5223 8.02554 37.8042 7.60602C38.0952 7.17738 38.3453 6.56635 38.5544 5.77291C38.5726 5.69083 38.5908 5.61332 38.609 5.54036C38.6272 5.45828 38.6408 5.38076 38.6499 5.3078C38.5044 4.97036 38.3498 4.73324 38.1861 4.59644C38.0315 4.45052 37.8769 4.37756 37.7223 4.37756C37.495 4.37756 37.2813 4.50068 37.0812 4.74692C36.8902 4.98404 36.7311 5.285 36.6038 5.64979C36.4856 6.01459 36.4265 6.37939 36.4265 6.74419C36.4265 7.24578 36.481 7.6197 36.5901 7.86594C36.7084 8.11218 36.8539 8.23529 37.0267 8.23529Z" fill="currentColor" />
+      <path d="M43.5804 9.95896C43.253 9.95896 42.962 9.82672 42.7074 9.56224C42.4528 9.28865 42.3254 8.90561 42.3254 8.41313C42.3254 8.17601 42.3527 7.90698 42.4073 7.60602C42.4619 7.30506 42.5255 6.99954 42.5983 6.68947C42.671 6.37027 42.7347 6.07387 42.7892 5.80027C42.8438 5.51756 42.8711 5.285 42.8711 5.1026C42.8711 4.91108 42.8347 4.7606 42.762 4.65116C42.6983 4.5326 42.6119 4.47332 42.5028 4.47332C42.33 4.47332 42.1527 4.59188 41.9708 4.829L41.8889 4.77428C41.8798 4.62836 41.9117 4.45508 41.9844 4.25445C42.0572 4.05381 42.1709 3.86229 42.3254 3.67989C42.48 3.48837 42.6756 3.32877 42.912 3.20109C43.1575 3.07342 43.444 3.00958 43.7714 3.00958C44.2533 3.00958 44.6035 3.15093 44.8217 3.43365C45.04 3.70725 45.1491 4.04013 45.1491 4.43228C45.1491 4.49612 45.1445 4.56452 45.1354 4.63748C45.1354 4.70132 45.1309 4.76516 45.1218 4.829C45.4492 4.23621 45.7902 3.78477 46.1449 3.47469C46.5086 3.15549 46.8451 2.9959 47.1543 2.9959C47.4453 2.9959 47.659 3.1099 47.7954 3.33789C47.9318 3.56589 48 3.83949 48 4.15869C48 4.45052 47.9409 4.74692 47.8227 5.04788C47.7135 5.34884 47.5453 5.59964 47.318 5.80027C47.0997 5.99179 46.8314 6.08299 46.5132 6.07387L46.4586 6.04651C46.4495 5.80939 46.3722 5.62243 46.2267 5.48564C46.0812 5.34884 45.9175 5.28044 45.7356 5.28044C45.4901 5.28044 45.2582 5.40356 45.04 5.64979C44.8308 5.89603 44.7262 6.25171 44.7262 6.71683C44.7262 6.99954 44.758 7.30506 44.8217 7.63338C44.8854 7.9617 44.9172 8.23985 44.9172 8.46785C44.9172 8.74145 44.8535 8.99225 44.7262 9.22025C44.5989 9.44824 44.4352 9.63064 44.2352 9.76744C44.0351 9.89512 43.8168 9.95896 43.5804 9.95896Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HideTrayIcon() {
+  return (
+    <svg
+      className="wv-tray-hide-icon"
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <g clipPath="url(#wv-hide-tray-clip-prompt)">
+        <path d="M4 11L4 1M3 11L9 11C10.1046 11 11 10.1046 11 9L11 3C11 1.89543 10.1046 1 9 1L3 1C1.89543 1 1 1.89543 1 3L1 9C1 10.1046 1.89543 11 3 11Z" stroke="currentColor" strokeLinecap="round" />
+      </g>
+      <defs>
+        <clipPath id="wv-hide-tray-clip-prompt">
+          <rect width="12" height="12" fill="white" transform="translate(0 12) rotate(-90)" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M8 6.45V8.55C8 10.3 7.3 11 5.55 11H3.45C1.7 11 1 10.3 1 8.55V6.45C1 4.7 1.7 4 3.45 4H5.55C7.3 4 8 4.7 8 6.45Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M11 3.45V5.55C11 7.3 10.3 8 8.55 8H8V6.45C8 4.7 7.3 4 5.55 4H4V3.45C4 1.7 4.7 1 6.45 1H8.55C10.3 1 11 1.7 11 3.45Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function CopySuccessIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M11 5.55V3.45C11 1.7 10.3 1 8.55 1H6.45C4.7 1 4 1.7 4 3.45V4H5.55C7.3 4 8 4.7 8 6.45V8H8.55C10.3 8 11 7.3 11 5.55Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M8 8.55V6.45C8 4.7 7.3 4 5.55 4H3.45C1.7 4 1 4.7 1 6.45V8.55C1 10.3 1.7 11 3.45 11H5.55C7.3 11 8 10.3 8 8.55Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M3.04004 7.4999L4.01504 8.4749L5.96004 6.5249" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M4 12h16M12 4c2.5 2.2 2.5 13.8 0 16M12 4c-2.5 2.2-2.5 13.8 0 16" />
+    </svg>
   );
 }

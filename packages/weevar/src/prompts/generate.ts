@@ -52,6 +52,24 @@ function jsxRef(id: ElementIdentity): string {
   return `${withDisambiguation(id).replace(/>$/, "")} />`;
 }
 
+function domPathTail(id: ElementIdentity, segments = 3): string {
+  const tail = id.domPath?.slice(-segments) ?? [];
+  if (!tail.length) return "";
+  return tail.map((s) => `${s.tag}[${s.index}]`).join(">");
+}
+
+/**
+ * Non-lossy identifier for short prompts:
+ * keeps human-readable symbol + concrete source/path anchors for deterministic edits.
+ */
+function strictRef(id: ElementIdentity): string {
+  const core = withDisambiguation(id, true);
+  const src = id.source ? `${id.source.file}:${id.source.line}` : "source:unknown";
+  const path = domPathTail(id);
+  const hash = `h:${id.contentHash}`;
+  return path ? `${core} {src:${src}; dom:${path}; ${hash}}` : `${core} {src:${src}; ${hash}}`;
+}
+
 function displacementAnchor(siblings: ElementIdentity[], toIndex: number): string {
   if (!siblings.length || siblings.length === 1) return "as the only child";
   if (toIndex <= 0) return "first";
@@ -101,21 +119,24 @@ function hasMissingSource(change: LayoutChange): boolean {
 }
 
 function shortReorder(change: Extract<LayoutChange, { kind: "reorder" }>): string {
-  const parentRef = baseRef(change.parent);
-  const targetRef = baseRef(change.target);
+  const parentRef = strictRef(change.parent);
+  const targetRef = strictRef(change.target);
   const file = change.parent.source?.file;
   const targetLine = change.target.source?.line;
   const anchor = displacementAnchor(change.siblings, change.toIndex);
-  const pos = `position ${change.toIndex + 1} (${anchor})`;
+  const pos = `child index ${change.toIndex} (position ${change.toIndex + 1}; ${anchor})`;
   const where = file ? ` in ${file}` : "";
   const line = targetLine ? ` (${lineText(targetLine)})` : "";
-  return `Reorder children of ${parentRef}${where}: move ${targetRef}${line} from position ${change.fromIndex + 1} to ${pos}. Preserve all props and styles.`;
+  const order = buildSiblingRenderData(change.siblings)
+    .map((s, i) => `${i}: ${s}`)
+    .join(" | ");
+  return `Reorder children of ${parentRef}${where}: move ${targetRef}${line} from child index ${change.fromIndex} (position ${change.fromIndex + 1}) to ${pos}. Resulting order: ${order}. Preserve all props and styles.`;
 }
 
 function shortMove(change: Extract<LayoutChange, { kind: "move" }>): string {
-  const targetRef = baseRef(change.target);
-  const fromRef = baseRef(change.fromParent);
-  const toRef = baseRef(change.toParent);
+  const targetRef = strictRef(change.target);
+  const fromRef = strictRef(change.fromParent);
+  const toRef = strictRef(change.toParent);
   const fromLoc = formatLocation(change.fromParent.source);
   const toLoc = formatLocation(change.toParent.source);
   const siblings = moveSiblings(change);
@@ -130,7 +151,10 @@ function shortMove(change: Extract<LayoutChange, { kind: "move" }>): string {
           : `as ${anchor}`;
   const targetLine = change.target.source?.line;
   const line = targetLine ? ` (${lineText(targetLine)})` : "";
-  return `Move ${targetRef}${line} from ${fromRef}${fromLoc ? ` (${fromLoc})` : ""} into ${toRef}${toLoc ? ` (${toLoc})` : ""} ${shortAnchor}. Preserve all props.`;
+  const order = buildSiblingRenderData(siblings)
+    .map((s, i) => `${i}: ${s}`)
+    .join(" | ");
+  return `Move ${targetRef}${line} from ${fromRef}${fromLoc ? ` (${fromLoc})` : ""} (child index ${change.fromIndex}) into ${toRef}${toLoc ? ` (${toLoc})` : ""} at child index ${change.toIndex} (${shortAnchor}). Destination order after move: ${order}. Preserve all props.`;
 }
 
 function detailedReorder(change: Extract<LayoutChange, { kind: "reorder" }>, tool: PromptOptions["targetTool"]): string {

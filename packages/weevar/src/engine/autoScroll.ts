@@ -1,49 +1,37 @@
-/** TRD §6: scroll nearest scrollable ancestor when cursor is within 60px of edge. */
+/** TRD §6: gentle viewport-edge autoscroll during drag. */
 export function autoScrollForPoint(clientX: number, clientY: number): void {
-  const margin = 60;
-  const el = document.elementFromPoint(clientX, clientY) as Element | null;
-  if (!el) return;
+  // Scroll only when the cursor is very close to the viewport edge.
+  const edgeZone = 20;
+  // Keep speed intentionally low for controllable drop targeting.
+  const maxSpeed = 6;
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+  let viewportDx = 0;
+  let viewportDy = 0;
 
-  const sc = findNearestScrollable(el);
-  if (!sc) return;
+  const leftViewport = clientX;
+  const rightViewport = viewportW - clientX;
+  const topViewport = clientY;
+  const bottomViewport = viewportH - clientY;
 
-  const r = sc.getBoundingClientRect();
-  let dsx = 0;
-  let dsy = 0;
+  if (leftViewport < edgeZone) {
+    viewportDx = -edgeSpeed(edgeZone - leftViewport, edgeZone, maxSpeed);
+  } else if (rightViewport < edgeZone) {
+    viewportDx = edgeSpeed(edgeZone - rightViewport, edgeZone, maxSpeed);
+  }
 
-  const left = clientX - r.left;
-  const right = r.right - clientX;
-  const top = clientY - r.top;
-  const bottom = r.bottom - clientY;
+  if (topViewport < edgeZone) {
+    viewportDy = -edgeSpeed(edgeZone - topViewport, edgeZone, maxSpeed);
+  } else if (bottomViewport < edgeZone) {
+    viewportDy = edgeSpeed(edgeZone - bottomViewport, edgeZone, maxSpeed);
+  }
 
-  if (left < margin && left >= 0) dsx = -((margin - left) * 0.5);
-  if (right < margin && right >= 0) dsx = (margin - right) * 0.5;
-  if (top < margin && top >= 0) dsy = -((margin - top) * 0.5);
-  if (bottom < margin && bottom >= 0) dsy = (margin - bottom) * 0.5;
-
-  if (dsx !== 0) sc.scrollLeft += dsx;
-  if (dsy !== 0) sc.scrollTop += dsy;
+  if (viewportDx === 0 && viewportDy === 0) return;
+  window.scrollBy(viewportDx, viewportDy);
 }
 
-function findNearestScrollable(start: Element): HTMLElement | null {
-  let cur: Element | null = start;
-  while (cur && cur !== document.documentElement) {
-    if (cur instanceof HTMLElement) {
-      const cs = getComputedStyle(cur);
-      const oy = cs.overflowY;
-      const ox = cs.overflowX;
-      const canY =
-        (oy === "auto" || oy === "scroll" || oy === "overlay") &&
-        cur.scrollHeight > cur.clientHeight + 1;
-      const canX =
-        (ox === "auto" || ox === "scroll" || ox === "overlay") &&
-        cur.scrollWidth > cur.clientWidth + 1;
-      if (canY || canX) return cur;
-    }
-    cur = cur.parentElement;
-  }
-  const root = document.documentElement;
-  if (root.scrollHeight > root.clientHeight + 1 || root.scrollWidth > root.clientWidth + 1)
-    return root;
-  return null;
+function edgeSpeed(depth: number, margin: number, maxSpeed: number): number {
+  const t = Math.max(0, Math.min(1, depth / margin));
+  // Gentle cubic ramp keeps movement smooth and easy to stop.
+  return maxSpeed * t * t * t;
 }

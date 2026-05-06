@@ -64,6 +64,18 @@ export type LayoutChangeMove = {
 
 export type LayoutChange = LayoutChangeReorder | LayoutChangeMove;
 
+export type BatchedChange = {
+  ordinal: number;
+  change: LayoutChange;
+  badgeAnchor: ElementIdentity;
+  capturedAt: number;
+};
+
+export type MoveSession = {
+  changes: BatchedChange[];
+  startedAt: number;
+};
+
 export type TargetTool = "claude-code" | "codex" | "generic";
 
 export type PromptLength = "short" | "detailed";

@@ -11,7 +11,7 @@ const el = (overrides: Partial<ElementIdentity>): ElementIdentity => ({
 });
 
 describe("generatePrompt fixtures", () => {
-  it("renders worked reorder short example verbatim", () => {
+  it("renders worked reorder short example with strict identifiers", () => {
     const change: LayoutChange = {
       kind: "reorder",
       target: el({
@@ -37,12 +37,15 @@ describe("generatePrompt fixtures", () => {
     };
 
     const out = generatePrompt(change, { targetTool: "claude-code" });
-    expect(out?.short).toBe(
-      "Reorder children of <Nav> in src/components/Header.tsx: move <SignInButton> (line 24) from position 2 to position 5 (last). Preserve all props and styles.",
-    );
+    expect(out?.short).toContain("Reorder children of <Nav>");
+    expect(out?.short).toContain("src/components/Header.tsx:14");
+    expect(out?.short).toContain("move <SignInButton>");
+    expect(out?.short).toContain("from child index 1");
+    expect(out?.short).toContain("to child index 4");
+    expect(out?.short).toContain("Resulting order:");
   });
 
-  it("renders worked move short example verbatim", () => {
+  it("renders worked move short example with strict identifiers", () => {
     const change: LayoutChange = {
       kind: "move",
       target: el({
@@ -70,9 +73,12 @@ describe("generatePrompt fixtures", () => {
     };
 
     const out = generatePrompt(change, { targetTool: "claude-code" });
-    expect(out?.short).toBe(
-      "Move <CTAButton> (line 34) from <Sidebar> (src/Sidebar.tsx:22) into <Hero> (src/Hero.tsx:8) as the last child. Preserve all props.",
-    );
+    expect(out?.short).toContain("Move <CTAButton>");
+    expect(out?.short).toContain("src/Sidebar.tsx:22");
+    expect(out?.short).toContain("src/Hero.tsx:8");
+    expect(out?.short).toContain("(child index 2)");
+    expect(out?.short).toContain("at child index 3");
+    expect(out?.short).toContain("Destination order after move:");
   });
 
   it("renders detailed reorder sections", () => {
@@ -212,7 +218,7 @@ describe("generatePrompt edge cases", () => {
     expect(generatePrompt(change, { targetTool: "claude-code" })).toBeNull();
   });
 
-  it("prefers component name over classes by default", () => {
+  it("still includes component names in strict refs", () => {
     const button = el({
       componentName: "Button",
       classList: ["primary", "lg"],
@@ -228,7 +234,41 @@ describe("generatePrompt edge cases", () => {
     };
     const out = generatePrompt(change, { targetTool: "claude-code" });
     expect(out?.short).toContain("<Button>");
-    expect(out?.short).not.toContain("<Button.primary>");
+  });
+
+  it("includes non-lossy source and dom anchors in short refs", () => {
+    const target = el({
+      componentName: "App",
+      source: { file: "src/App.tsx", line: 176, col: 0 },
+      domPath: [
+        { tag: "div", index: 0 },
+        { tag: "main", index: 1 },
+        { tag: "section", index: 2 },
+      ],
+    });
+    const parent = el({
+      componentName: "App",
+      source: { file: "src/App.tsx", line: 168, col: 0 },
+      domPath: [
+        { tag: "div", index: 0 },
+        { tag: "main", index: 1 },
+        { tag: "section", index: 0 },
+      ],
+    });
+    const change: LayoutChange = {
+      kind: "reorder",
+      target,
+      parent,
+      fromIndex: 0,
+      toIndex: 1,
+      siblings: [el({ componentName: "App" }), target],
+      layoutType: { display: "block" },
+    };
+    const out = generatePrompt(change, { targetTool: "claude-code" });
+    expect(out?.short).toContain("src:src/App.tsx:168");
+    expect(out?.short).toContain("src:src/App.tsx:176");
+    expect(out?.short).toContain("dom:div[0]>main[1]>section[2]");
+    expect(out?.short).toContain("h:0");
   });
 });
 

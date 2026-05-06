@@ -18,6 +18,7 @@ export function buildMoveLayoutChange(
     fromIndex,
     toIndex,
     siblings: orderedInTarget.map((el) => buildElementIdentity(el)),
+    destinationSiblings: orderedInTarget.map((el) => buildElementIdentity(el)),
     fromLayoutType: readLayoutType(fromParent),
     toLayoutType: readLayoutType(toParent),
   };

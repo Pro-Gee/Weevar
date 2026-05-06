@@ -6,10 +6,13 @@ export class FlexOrderPreview {
   apply(ordered: Element[]): void {
     ordered.forEach((el, i) => {
       const hel = el as HTMLElement;
+      const desired = String(i);
+      const current = hel.style.getPropertyValue(ORDER_PROP);
+      if (current === desired) return;
       if (!this.previous.has(el)) {
         this.previous.set(el, hel.style.getPropertyValue(ORDER_PROP));
       }
-      hel.style.setProperty(ORDER_PROP, String(i));
+      hel.style.setProperty(ORDER_PROP, desired);
     });
   }
 
