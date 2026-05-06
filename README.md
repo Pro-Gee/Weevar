@@ -1,18 +1,17 @@
 # Weevar
 
-Weevar is a dev-only UI overlay for React apps. You move elements directly in the running page, then copy a structured prompt for AI coding assistants.
+A dev tool that lets you rearrange your UI visually in the browser—then turns those changes into prompts for AI to implement in code.
 
-## Status
+Weevar is **development-only**: it runs as an overlay in your React app while you work locally. Nothing ships to production by until you push.
 
-Public beta toward stable `v1.0`.
 
-## Quickstart
+## Installation
 
 ```bash
 npm install weevar
 ```
 
-In your app root:
+Mount in your app root:
 
 ```tsx
 import { Weevar } from "weevar/react";
@@ -27,7 +26,7 @@ export function Root() {
 }
 ```
 
-For Vite projects:
+### Vite
 
 ```ts
 import { defineConfig } from "vite";
@@ -39,43 +38,58 @@ export default defineConfig({
 });
 ```
 
-Run your dev server and press `Cmd/Ctrl + Shift + E`.
+Run your dev server and press **⌘⇧E** (Mac) or **Ctrl+Shift+E** (Windows/Linux) to toggle the overlay.
+
+## Requirements
+
+- **Node.js** `>= 18.18`
+- A **React** app (`react` / `react-dom` **>= 17**)
+- **Development mode** (run your usual dev server—e.g. Vite, Next dev—not a production build)
+- **Bundler integration** is recommended for the best experience (see **Vite** below); other setups may need extra configuration—see the [Install](https://github.com/weevar/weevar/blob/main/docs/INSTALL.md) guide.
+
+## How it works
+
+1. Run your app in dev mode.
+2. Turn on the overlay (shortcut below).
+3. Click and drag elements to rearrange them.
+4. See the layout update instantly.
+
+When you’re done, the tool generates a prompt—for example:
+
+> Move the CTA button below the feature list and keep spacing consistent across all cards.
+
+Paste that into your AI coding tool, and it updates your code.
+
+## What you can do right now
+
+- Reorder elements within a layout.
+- Move elements between sections.
+- Experiment with layout structure visually.
+
+This version is focused on **layout and structure** only.
+
+## Why this is useful
+
+Explaining layout changes is harder than it sounds:
+
+- “Put this under that.”
+- “Move this to the right but keep it aligned.”
+- “Reorder these cards.”
+
+Instead of describing it, you move things directly and let Weevar translate that into a structured prompt.
 
 ## Documentation
 
-- [Install Guide](docs/INSTALL.md)
-- [Usage Guide](docs/USAGE.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Compatibility](docs/COMPATIBILITY.md)
-- [Security and Privacy](docs/SECURITY.md)
-- [Release Checklist](docs/RELEASE.md)
+Full guides live in the repository:
 
-## What Weevar does
-
-- Select and move live UI elements in development
-- Show visual drop targets and insertion bars
-- Track changes and generate structured prompts
-- Copy prompts in short/detailed formats
-
-## Current constraints
-
-- Dev-only runtime; no production behavior by design
-- Chromium-first validation
-- Layout move/reorder focus (not full style editor)
-- React-first support
-
-## Contributing
-
-Internal development commands:
-
-```bash
-npm run dev
-npm run test
-npm run test:e2e:setup
-npm run test:e2e
-npm run release:check
-```
+- [Install](https://github.com/weevar/weevar/blob/main/docs/INSTALL.md)
+- [Usage](https://github.com/weevar/weevar/blob/main/docs/USAGE.md)
+- [Troubleshooting](https://github.com/weevar/weevar/blob/main/docs/TROUBLESHOOTING.md)
+- [Compatibility](https://github.com/weevar/weevar/blob/main/docs/COMPATIBILITY.md)
+- [Security](https://github.com/weevar/weevar/blob/main/docs/SECURITY.md)
 
 ## License
 
-MIT
+© 2026 Gideon Adeyemi. All rights reserved.
+
+licensed under the MIT License.

@@ -1,8 +1,11 @@
 # Weevar
 
-Weevar is a **development-only** UI overlay for React apps. Move elements directly on the running page, then copy a structured prompt for AI coding assistants.
+A dev tool that lets you rearrange your UI visually in the browser—then turns those changes into prompts for AI to implement in code.
 
-## Quickstart
+Weevar is **development-only**: it runs as an overlay in your React app while you work locally. Nothing ships to production by until you push.
+
+
+## Installation
 
 ```bash
 npm install weevar
@@ -35,7 +38,45 @@ export default defineConfig({
 });
 ```
 
-Run your dev server and press **⌘⇧E** (Mac) or **Ctrl+Shift+E** (Windows/Linux).
+Run your dev server and press **⌘⇧E** (Mac) or **Ctrl+Shift+E** (Windows/Linux) to toggle the overlay.
+
+## Requirements
+
+- **Node.js** `>= 18.18`
+- A **React** app (`react` / `react-dom` **>= 17**)
+- **Development mode** (run your usual dev server—e.g. Vite, Next dev—not a production build)
+- **Bundler integration** is recommended for the best experience (see **Vite** below); other setups may need extra configuration—see the [Install](https://github.com/weevar/weevar/blob/main/docs/INSTALL.md) guide.
+
+## How it works
+
+1. Run your app in dev mode.
+2. Turn on the overlay (shortcut below).
+3. Click and drag elements to rearrange them.
+4. See the layout update instantly.
+
+When you’re done, the tool generates a prompt—for example:
+
+> Move the CTA button below the feature list and keep spacing consistent across all cards.
+
+Paste that into your AI coding tool, and it updates your code.
+
+## What you can do right now
+
+- Reorder elements within a layout.
+- Move elements between sections.
+- Experiment with layout structure visually.
+
+This version is focused on **layout and structure** only.
+
+## Why this is useful
+
+Explaining layout changes is harder than it sounds:
+
+- “Put this under that.”
+- “Move this to the right but keep it aligned.”
+- “Reorder these cards.”
+
+Instead of describing it, you move things directly and let Weevar translate that into a structured prompt.
 
 ## Documentation
 
@@ -47,18 +88,8 @@ Full guides live in the repository:
 - [Compatibility](https://github.com/weevar/weevar/blob/main/docs/COMPATIBILITY.md)
 - [Security](https://github.com/weevar/weevar/blob/main/docs/SECURITY.md)
 
-## Features
-
-- Select and move live UI elements in development
-- Visual drop targets and insertion hints
-- Track layout changes and generate structured prompts
-
-## Constraints
-
-- Intended for **development** only
-- React-first; Chromium is the primary test target
-- Focus on layout moves/reorders (not a general style editor)
-
 ## License
 
-MIT
+© 2026 Gideon Adeyemi. All rights reserved.
+
+licensed under the MIT License.
