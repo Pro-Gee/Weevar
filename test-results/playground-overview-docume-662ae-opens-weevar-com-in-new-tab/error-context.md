@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: playground.spec.ts >> designed trigger is present on fresh load
-- Location: e2e/playground.spec.ts:34:16
+- Name: playground.spec.ts >> overview documentation arrow opens weevar.com in new tab
+- Location: e2e/playground.spec.ts:87:16
 
 # Error details
 

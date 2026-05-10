@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: playground.spec.ts >> designed trigger is present on fresh load
-- Location: e2e/playground.spec.ts:34:16
+- Name: playground.spec.ts >> keyboard shortcut mounts host
+- Location: e2e/playground.spec.ts:75:16
 
 # Error details
 

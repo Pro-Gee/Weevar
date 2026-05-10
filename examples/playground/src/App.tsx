@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import "./app.css";
 import {
   applyDomTheme,
   getStoredTheme,

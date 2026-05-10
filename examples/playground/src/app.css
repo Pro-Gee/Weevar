@@ -733,3 +733,35 @@ body {
     flex-basis: min(92%, 300px);
   }
 }
+
+.desktop-only-screen {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 24px;
+  background: var(--pg-bg);
+  color: var(--pg-text);
+  font-family: var(--pg-font-sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-align: center;
+}
+
+.desktop-only-title {
+  margin: 0;
+  max-width: 420px;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.desktop-only-body {
+  margin: 0;
+  max-width: 420px;
+  font-size: 15px;
+  color: var(--pg-muted);
+}

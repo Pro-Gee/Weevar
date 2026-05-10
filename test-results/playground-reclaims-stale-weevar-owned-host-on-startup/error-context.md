@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: playground.spec.ts >> designed trigger is present on fresh load
-- Location: e2e/playground.spec.ts:34:16
+- Name: playground.spec.ts >> reclaims stale weevar-owned host on startup
+- Location: e2e/playground.spec.ts:135:16
 
 # Error details
 
