@@ -7,6 +7,8 @@
   ],
   "scripts": {
     "build": "npm run build -w weevar",
+    "build:playground": "npm run build -w weevar && npm run build -w playground",
+    "build:playground:demo": "npm run build -w weevar && VITE_WEEVAR_PUBLIC_DEMO=true npm run build -w playground",
     "dev": "npm run dev -w playground",
     "test": "npm run test -w weevar",
     "test:e2e:setup": "playwright install chromium",

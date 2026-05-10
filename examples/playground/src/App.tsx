@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import "./app.css";
-import { applyDomTheme, getStoredTheme, persistTheme, type ThemeMode } from "./theme";
+import {
+  applyDomTheme,
+  getStoredTheme,
+  isPublicDemoBuild,
+  persistTheme,
+  type ThemeMode,
+} from "./theme";
 
 const tocNav = [
   { label: "Gallery", href: "#gallery" },
@@ -115,6 +121,11 @@ export function App() {
 
   return (
     <div className="playground-root">
+      {isPublicDemoBuild() ? (
+        <div className="demo-banner" role="note">
+          Public demo — Weevar resets when you refresh; theme choice is not saved.
+        </div>
+      ) : null}
       <div className="layout-grid">
         <aside className="sidebar">
           <nav className="sidebar-nav" aria-label="Table of contents">

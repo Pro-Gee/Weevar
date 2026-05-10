@@ -26,6 +26,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Build playground (public demo bundle)
+        run: npm run build:playground:demo
+
       - name: Unit tests
         run: npm run test
 

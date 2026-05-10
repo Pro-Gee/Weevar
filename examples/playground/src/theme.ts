@@ -2,7 +2,23 @@ export type ThemeMode = "system" | "light" | "dark";
 
 const STORAGE_KEY = "pg-theme";
 
+/** Build-time flag: set `VITE_WEEVAR_PUBLIC_DEMO=true` for demo.weevar.com–style deploys (no theme persistence; clears stale keys on load). */
+export function isPublicDemoBuild(): boolean {
+  return import.meta.env.VITE_WEEVAR_PUBLIC_DEMO === "true";
+}
+
+/** Avoid inheriting `pg-theme` from a prior non-demo session on the same origin. */
+export function clearPublicDemoStalePrefs(): void {
+  if (!isPublicDemoBuild()) return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function getStoredTheme(): ThemeMode {
+  if (isPublicDemoBuild()) return "system";
   if (typeof window === "undefined") return "system";
   try {
     const v = localStorage.getItem(STORAGE_KEY);
@@ -14,6 +30,7 @@ export function getStoredTheme(): ThemeMode {
 }
 
 export function persistTheme(mode: ThemeMode) {
+  if (isPublicDemoBuild()) return;
   try {
     localStorage.setItem(STORAGE_KEY, mode);
   } catch {

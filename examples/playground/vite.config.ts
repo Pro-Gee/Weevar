@@ -9,6 +9,13 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 const weevarPkgPath = path.resolve(root, "../../packages/weevar/package.json");
 const weevarVersion = JSON.parse(readFileSync(weevarPkgPath, "utf8")).version as string;
 
+/**
+ * Public demo (e.g. demo.weevar.com): build with `VITE_WEEVAR_PUBLIC_DEMO=true` so theme does not
+ * persist and index.html skips reading localStorage before hydration.
+ *
+ * The overlay stays enabled because this app resolves `weevar/react` to `entry-dev.tsx`; the
+ * published npm package uses `WeevarProd` (no-op) under production conditions instead.
+ */
 export default defineConfig({
   define: {
     __WEEVAR_VERSION__: JSON.stringify(weevarVersion),
