@@ -71,7 +71,7 @@
 /* Light palette */
 [data-theme="light"] {
   color-scheme: light;
-  --pg-bg: #ffffff;
+  --pg-bg: #eaeaea;
   --pg-surface: #ffffff;
   --pg-border: rgba(0, 0, 0, 0.09);
   --pg-border-strong: rgba(0, 0, 0, 0.14);
@@ -103,7 +103,7 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --pg-bg: #ffffff;
+    --pg-bg: #eaeaea;
     --pg-surface: #ffffff;
     --pg-border: rgba(0, 0, 0, 0.09);
     --pg-border-strong: rgba(0, 0, 0, 0.14);
