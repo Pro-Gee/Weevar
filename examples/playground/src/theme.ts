@@ -18,15 +18,15 @@ export function clearPublicDemoStalePrefs(): void {
 }
 
 export function getStoredTheme(): ThemeMode {
-  if (isPublicDemoBuild()) return "system";
-  if (typeof window === "undefined") return "system";
+  if (isPublicDemoBuild()) return "light";
+  if (typeof window === "undefined") return "light";
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v === "light" || v === "dark" || v === "system") return v;
   } catch {
     /* ignore */
   }
-  return "system";
+  return "light";
 }
 
 export function persistTheme(mode: ThemeMode) {

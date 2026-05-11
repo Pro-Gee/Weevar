@@ -49,10 +49,10 @@
         try {
           /* Replaced at build time when VITE_WEEVAR_PUBLIC_DEMO is set (see Vite HTML env substitution). */
           var demo = "%VITE_WEEVAR_PUBLIC_DEMO%" === "true";
-          if (demo) return;
-          var t = localStorage.getItem("pg-theme");
-          if (t === "light") document.documentElement.setAttribute("data-theme", "light");
+          var t = demo ? "light" : localStorage.getItem("pg-theme");
+          if (t === "system") document.documentElement.removeAttribute("data-theme");
           else if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+          else document.documentElement.setAttribute("data-theme", "light");
         } catch (e) {}
       })();
     </script>
