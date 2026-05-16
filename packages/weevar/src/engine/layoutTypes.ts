@@ -64,17 +64,56 @@ export type LayoutChangeMove = {
 
 export type LayoutChange = LayoutChangeReorder | LayoutChangeMove;
 
+export type ElementCategory = "text" | "svg" | "image" | "stack" | "generic";
+
+/** One committed change to a single CSS property on one element. */
+export type StylePropertyChange = {
+  /** Exact CSS property name e.g. "font-size", "border-radius" */
+  cssProperty: string;
+  /** Human-readable label shown in the prompt e.g. "Font Size" */
+  displayLabel: string;
+  /** Computed value before user edited e.g. "14px" */
+  fromValue: string;
+  /** Committed value after edit e.g. "18px" */
+  toValue: string;
+};
+
+/** A committed style edit: one or more property changes on one element in one commit action. */
+export type StyleTweak = {
+  kind: "style-tweak";
+  target: ElementIdentity;
+  elementCategory: ElementCategory;
+  /** All CSS properties changed in this single commit action. */
+  changes: StylePropertyChange[];
+  /**
+   * When a border-* property was committed and the resulting border is visible:
+   * concise type / weight / colour for prompts (DOM snapshot after commit).
+   */
+  borderSummary?: string;
+};
+
+/**
+ * All change kinds tracked by Weevar.
+ * V1 had only LayoutChange (reorder | move).
+ * V2 adds style-tweak.
+ */
+export type WeevarChange = LayoutChange | StyleTweak;
+
 export type BatchedChange = {
   ordinal: number;
-  change: LayoutChange;
+  change: WeevarChange;
   badgeAnchor: ElementIdentity;
   capturedAt: number;
 };
 
-export type MoveSession = {
+/** Canonical V2 session type — tracks all change kinds (moves + style tweaks). */
+export type EditSession = {
   changes: BatchedChange[];
   startedAt: number;
 };
+
+/** @deprecated Use EditSession. Alias kept so existing references continue to compile. */
+export type MoveSession = EditSession;
 
 export type TargetTool = "claude-code" | "codex" | "generic";
 
@@ -86,7 +125,7 @@ export type GeneratedPrompt = {
   meta: {
     targetTool: TargetTool;
     timestamp: number;
-    change: LayoutChange;
+    change: WeevarChange;
   };
 };
 

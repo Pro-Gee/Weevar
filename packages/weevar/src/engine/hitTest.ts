@@ -10,6 +10,28 @@ export function isInsideWeevarOverlay(el: Node | null): boolean {
   return false;
 }
 
+/** Deepest focused element (walks open shadow roots). */
+export function getDeepActiveElement(): Element | null {
+  let active: Element | null = document.activeElement;
+  while (active?.shadowRoot?.activeElement) {
+    active = active.shadowRoot.activeElement as Element;
+  }
+  return active;
+}
+
+/**
+ * If focus is inside Weevar chrome and the pointer is outside that node, blur so
+ * e.g. EditTray inputs commit before pointerdown handlers call preventDefault.
+ */
+export function blurWeevarOverlayFocusIfPointerOutside(e: Pick<PointerEvent, "target">): void {
+  const ae = getDeepActiveElement();
+  if (!(ae instanceof HTMLElement)) return;
+  if (!isInsideWeevarOverlay(ae)) return;
+  const t = e.target;
+  if (t instanceof Node && ae.contains(t)) return;
+  ae.blur();
+}
+
 /** Topmost element under point that belongs to the host app (not Weevar chrome). */
 export function hitTestHostPage(x: number, y: number): Element | null {
   const raw = document.elementFromPoint(x, y);

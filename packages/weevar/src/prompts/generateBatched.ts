@@ -48,11 +48,33 @@ export function generateBatchedPrompt(
 
   if (!perMove.length) return null;
 
+  // Count each kind so the header is accurate
+  const layoutCount = sorted.filter((c) => c.change.kind !== "style-tweak").length;
+  const styleCount = sorted.filter((c) => c.change.kind === "style-tweak").length;
+
+  let headerLabel: string;
+  if (layoutCount > 0 && styleCount > 0) {
+    headerLabel = `${sorted.length} changes (${styleCount} style update${styleCount > 1 ? "s" : ""}, ${layoutCount} layout move${layoutCount > 1 ? "s" : ""})`;
+  } else if (styleCount > 0) {
+    headerLabel = `${sorted.length} style update${sorted.length > 1 ? "s" : ""}`;
+  } else {
+    headerLabel = `${sorted.length} layout change${sorted.length > 1 ? "s" : ""}`;
+  }
+
+  const orderNote =
+    sorted.length > 1 && layoutCount > 0
+      ? " (apply in order; each step's positions are relative to the state after prior steps)"
+      : "";
+
   const shortItems = perMove
-    .map((x) => `${x.ordinal}. ${stripShortConstraint(x.p.short)}.`)
+    .map((x) => {
+      const shortText = stripShortConstraint(x.p.short).trimEnd();
+      const entry = shortText.endsWith(".") ? shortText : `${shortText}.`;
+      return `${x.ordinal}. ${entry}`;
+    })
     .join("\n\n");
   const short =
-    `${perMove.length} layout changes (apply in order; each step's positions are relative to the state after prior steps):\n\n` +
+    `${headerLabel}${orderNote}:\n\n` +
     `${shortItems}\n\n` +
     `Preserve all props and styles. Don't introduce wrapper elements.`;
 

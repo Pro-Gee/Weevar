@@ -3,7 +3,9 @@ import type {
   GeneratedPrompt,
   LayoutChange,
   LayoutType,
+  StyleTweak,
   TargetTool,
+  WeevarChange,
   WeevarRuntimeConfig,
 } from "../engine/layoutTypes";
 
@@ -11,6 +13,87 @@ type PromptOptions = {
   targetTool: TargetTool | "cursor";
   config?: WeevarRuntimeConfig;
 };
+
+// ─── Tailwind lookup tables (prompt suggestions only — no DOM logic) ──
+
+const TAILWIND_FONT_SIZE: Record<string, string> = {
+  "12px": "text-xs",
+  "14px": "text-sm",
+  "16px": "text-base",
+  "18px": "text-lg",
+  "20px": "text-xl",
+  "24px": "text-2xl",
+  "30px": "text-3xl",
+  "36px": "text-4xl",
+  "48px": "text-5xl",
+  "60px": "text-6xl",
+  "72px": "text-7xl",
+};
+
+const TAILWIND_FONT_WEIGHT: Record<string, string> = {
+  "100": "font-thin",
+  "200": "font-extralight",
+  "300": "font-light",
+  "400": "font-normal",
+  "500": "font-medium",
+  "600": "font-semibold",
+  "700": "font-bold",
+  "800": "font-extrabold",
+  "900": "font-black",
+};
+
+const TAILWIND_BORDER_RADIUS: Record<string, string> = {
+  "0px": "rounded-none",
+  "2px": "rounded-sm",
+  "4px": "rounded",
+  "6px": "rounded-md",
+  "8px": "rounded-lg",
+  "12px": "rounded-xl",
+  "16px": "rounded-2xl",
+  "24px": "rounded-3xl",
+};
+
+const TAILWIND_OPACITY: Record<string, string> = {
+  "0": "opacity-0",
+  "0.05": "opacity-5",
+  "0.1": "opacity-10",
+  "0.2": "opacity-20",
+  "0.25": "opacity-25",
+  "0.3": "opacity-30",
+  "0.4": "opacity-40",
+  "0.5": "opacity-50",
+  "0.6": "opacity-60",
+  "0.7": "opacity-70",
+  "0.75": "opacity-75",
+  "0.8": "opacity-80",
+  "0.9": "opacity-90",
+  "0.95": "opacity-95",
+  "1": "opacity-100",
+};
+
+const TAILWIND_TEXT_ALIGN: Record<string, string> = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+  justify: "text-justify",
+};
+
+function tailwindSuggestion(cssProperty: string, value: string): string | null {
+  switch (cssProperty) {
+    case "font-size":
+      return TAILWIND_FONT_SIZE[value] ?? null;
+    case "font-weight":
+      return TAILWIND_FONT_WEIGHT[value] ?? null;
+    case "border-radius":
+      return TAILWIND_BORDER_RADIUS[value] ?? null;
+    case "opacity":
+      return TAILWIND_OPACITY[value] ?? null;
+    case "text-align":
+      return TAILWIND_TEXT_ALIGN[value] ?? null;
+    default:
+      return null;
+  }
+}
 
 function lineText(line: number): string {
   return `line ${line}`;
@@ -58,16 +141,24 @@ function domPathTail(id: ElementIdentity, segments = 3): string {
   return tail.map((s) => `${s.tag}[${s.index}]`).join(">");
 }
 
+/** Braced `{src:…; dom:…; h:…}` anchor block used by `strictRef` and style prompts. */
+function identityBlock(id: ElementIdentity): string {
+  const srcPart = id.source ? `${id.source.file}:${id.source.line}` : "source:unknown";
+  const path = domPathTail(id);
+  const hash = `h:${id.contentHash}`;
+  const inner = path
+    ? [`src:${srcPart}`, `dom:${path}`, hash].join("; ")
+    : [`src:${srcPart}`, hash].join("; ");
+  return `{${inner}}`;
+}
+
 /**
  * Non-lossy identifier for short prompts:
  * keeps human-readable symbol + concrete source/path anchors for deterministic edits.
  */
 function strictRef(id: ElementIdentity): string {
   const core = withDisambiguation(id, true);
-  const src = id.source ? `${id.source.file}:${id.source.line}` : "source:unknown";
-  const path = domPathTail(id);
-  const hash = `h:${id.contentHash}`;
-  return path ? `${core} {src:${src}; dom:${path}; ${hash}}` : `${core} {src:${src}; ${hash}}`;
+  return `${core} ${identityBlock(id)}`;
 }
 
 function displacementAnchor(siblings: ElementIdentity[], toIndex: number): string {
@@ -259,10 +350,123 @@ function detailedMove(change: Extract<LayoutChange, { kind: "move" }>, tool: Pro
   return parts.join("\n");
 }
 
+function shortStyleTweak(change: StyleTweak): string {
+  const ref = baseRef(change.target);
+  const block = identityBlock(change.target);
+
+  const displayChange = change.changes.find((c) => c.cssProperty === "display");
+  const toDisplay = displayChange?.toValue ?? "";
+  const relevantChanges = change.changes.filter((c) => {
+    if (toDisplay === "grid" && c.cssProperty === "flex-direction") return false;
+    return true;
+  });
+
+  const props = relevantChanges
+    .map((c) => `\`${c.cssProperty}\` ${c.fromValue} → ${c.toValue}`)
+    .join("; ");
+
+  const borderNote = change.borderSummary
+    ? ` Effective border: ${change.borderSummary}.`
+    : "";
+
+  return `Update styles on ${ref} ${block}: ${props}.${borderNote} Preserve all props and event handlers.`;
+}
+
+function detailedStyleTweak(change: StyleTweak, options: PromptOptions): string {
+  const showTailwind = options.config?.prompts?.tailwindVerbatimClasses === true;
+  const ref = baseRef(change.target);
+  const src = change.target.source;
+  const classes = change.target.classList;
+
+  const fileLine = src ? `**File:** ${src.file}:${src.line}` : null;
+  const block = identityBlock(change.target);
+  const elementLine = classes.length
+    ? `**Element:** <${change.target.tag} className="${classes.join(" ")}"> ${block}`
+    : `**Element:** <${change.target.tag}> ${block}`;
+  const categoryLine = `**Category:** ${change.elementCategory}`;
+
+  const tableHeader = showTailwind
+    ? "| Property | CSS property | Before | After | Tailwind suggestion |"
+    : "| Property | CSS property | Before | After |";
+  const tableSep = showTailwind
+    ? "|---|---|---|---|---|"
+    : "|---|---|---|---|";
+
+  const rows = change.changes.map((c) => {
+    const fromSug = showTailwind ? tailwindSuggestion(c.cssProperty, c.fromValue) : null;
+    const toSug = showTailwind ? tailwindSuggestion(c.cssProperty, c.toValue) : null;
+    const twCell = showTailwind
+      ? ` | ${fromSug && toSug ? `\`${fromSug}\` → \`${toSug}\`` : "—"} |`
+      : "";
+    return `| ${c.displayLabel} | \`${c.cssProperty}\` | \`${c.fromValue}\` | \`${c.toValue}\` |${twCell}`;
+  });
+
+  const howToApply = showTailwind
+    ? [
+        "## How to apply",
+        "",
+        "**If using Tailwind CSS:** Replace class values using the Tailwind suggestion column.",
+        "If the exact value doesn't exist in your config, use the nearest matching Tailwind utility.",
+        "",
+        "**If using plain CSS, CSS Modules, or inline styles:** Apply the \"After\" values directly.",
+      ].join("\n")
+    : 'Apply the "After" values for each CSS property listed to the target element.';
+
+  const constraints = [
+    "## Constraints",
+    `- Only modify the specified properties on ${ref}`,
+    "- Preserve all existing props, event handlers, and other styles",
+    "- Do not introduce wrapper elements",
+    "- Do not change the component's structure or other components in the file",
+  ].join("\n");
+
+  const parts: string[] = [
+    `# Update styles on ${ref}`,
+    "",
+    ...(fileLine ? [fileLine] : []),
+    elementLine,
+    categoryLine,
+    "",
+    "## Style changes",
+    tableHeader,
+    tableSep,
+    ...rows,
+    ...(change.borderSummary
+      ? ["", `**Effective border:** ${change.borderSummary}`]
+      : []),
+    "",
+    howToApply,
+    "",
+    constraints,
+  ];
+
+  if (!src) {
+    parts.push(
+      "",
+      "_Tip: install the weevar Vite plugin for source-accurate file and line references in prompts._",
+    );
+  }
+
+  return parts.join("\n");
+}
+
 export function generatePrompt(
-  change: LayoutChange,
+  change: WeevarChange,
   options: PromptOptions,
 ): GeneratedPrompt | null {
+  if (change.kind === "style-tweak") {
+    if (!change.changes.length) return null;
+    const targetTool = options.targetTool === "cursor" ? "codex" : options.targetTool;
+    return {
+      short: shortStyleTweak(change),
+      detailed: detailedStyleTweak(change, { ...options, targetTool }),
+      meta: {
+        targetTool,
+        timestamp: Date.now(),
+        change,
+      },
+    };
+  }
   if (change.kind === "reorder" && change.fromIndex === change.toIndex) return null;
   if (
     change.kind === "move" &&

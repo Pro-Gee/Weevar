@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ElementIdentity, LayoutChange } from "../engine/layoutTypes";
+import type { ElementIdentity, LayoutChange, StyleTweak } from "../engine/layoutTypes";
 import { generatePrompt } from "./generate";
 
 const el = (overrides: Partial<ElementIdentity>): ElementIdentity => ({
@@ -293,5 +293,171 @@ describe("tool variants", () => {
     const generic = generatePrompt(change, { targetTool: "generic" })!;
     expect(claude.detailed).not.toBe(codex.detailed);
     expect(generic.detailed).toContain("## Current code");
+  });
+});
+
+describe("StyleTweak prompts", () => {
+  const baseTweak: StyleTweak = {
+    kind: "style-tweak",
+    target: {
+      tag: "p",
+      classList: ["text-sm", "font-normal"],
+      contentHash: "abc123",
+      label: "<Para>",
+      domPath: [],
+      componentName: "Para",
+    },
+    elementCategory: "text",
+    changes: [
+      {
+        cssProperty: "font-size",
+        displayLabel: "Font Size",
+        fromValue: "14px",
+        toValue: "18px",
+      },
+    ],
+  };
+
+  it("returns null for an empty changes array", () => {
+    const empty: StyleTweak = { ...baseTweak, changes: [] };
+    expect(generatePrompt(empty, { targetTool: "claude-code" })).toBeNull();
+  });
+
+  it("short prompt includes the component name", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p).not.toBeNull();
+    expect(p!.short).toContain("Para");
+  });
+
+  it("short prompt includes before and after values with arrow", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.short).toContain("14px");
+    expect(p!.short).toContain("18px");
+    expect(p!.short).toContain("→");
+  });
+
+  it("short prompt includes the preserve instruction", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.short).toContain("Preserve all props");
+  });
+
+  it("short and detailed prompts surface effective border when borderSummary is set", () => {
+    const tweak: StyleTweak = {
+      ...baseTweak,
+      borderSummary: "type solid, weight 1px, colour #112233",
+      changes: [
+        {
+          cssProperty: "border-style",
+          displayLabel: "Border Style",
+          fromValue: "none",
+          toValue: "solid",
+        },
+      ],
+    };
+    const p = generatePrompt(tweak, { targetTool: "claude-code" });
+    expect(p!.short).toContain("Effective border:");
+    expect(p!.short).toContain("type solid");
+    expect(p!.detailed).toContain("**Effective border:**");
+    expect(p!.detailed).toContain("colour #112233");
+  });
+
+  it("detailed prompt includes a table with before and after columns", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("| Font Size |");
+    expect(p!.detailed).toContain("`14px`");
+    expect(p!.detailed).toContain("`18px`");
+  });
+
+  it("detailed prompt does NOT include Tailwind column when disabled", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).not.toContain("Tailwind suggestion");
+  });
+
+  it("detailed prompt includes Tailwind column when enabled", () => {
+    const p = generatePrompt(baseTweak, {
+      targetTool: "claude-code",
+      config: { prompts: { tailwindVerbatimClasses: true } },
+    });
+    expect(p!.detailed).toContain("Tailwind suggestion");
+    expect(p!.detailed).toContain("text-sm");
+    expect(p!.detailed).toContain("text-lg");
+  });
+
+  it("detailed prompt includes the Constraints section", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("## Constraints");
+    expect(p!.detailed).toContain("Preserve all existing props");
+  });
+
+  it("detailed prompt includes the element tag", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("<p");
+  });
+
+  it("short prompt includes source file path when source is available", () => {
+    const withSource: StyleTweak = {
+      ...baseTweak,
+      target: {
+        ...baseTweak.target,
+        source: { file: "src/components/Para.tsx", line: 12, col: 4 },
+      },
+    };
+    const p = generatePrompt(withSource, { targetTool: "claude-code" });
+    expect(p!.short).toContain("src/components/Para.tsx");
+    expect(p!.short).toContain("12");
+  });
+
+  it("handles multiple property changes in one tweak", () => {
+    const multi: StyleTweak = {
+      ...baseTweak,
+      changes: [
+        {
+          cssProperty: "font-size",
+          displayLabel: "Font Size",
+          fromValue: "14px",
+          toValue: "18px",
+        },
+        {
+          cssProperty: "font-weight",
+          displayLabel: "Font Weight",
+          fromValue: "400",
+          toValue: "600",
+        },
+      ],
+    };
+    const p = generatePrompt(multi, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("font-size");
+    expect(p!.detailed).toContain("font-weight");
+  });
+
+  it("Tailwind suggestions map font-weight 400→600 correctly", () => {
+    const multi: StyleTweak = {
+      ...baseTweak,
+      changes: [
+        {
+          cssProperty: "font-weight",
+          displayLabel: "Font Weight",
+          fromValue: "400",
+          toValue: "600",
+        },
+      ],
+    };
+    const p = generatePrompt(multi, {
+      targetTool: "claude-code",
+      config: { prompts: { tailwindVerbatimClasses: true } },
+    });
+    expect(p!.detailed).toContain("font-normal");
+    expect(p!.detailed).toContain("font-semibold");
+  });
+
+  it("meta block contains the correct change kind and targetTool", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.meta.change.kind).toBe("style-tweak");
+    expect(p!.meta.targetTool).toBe("claude-code");
+  });
+
+  it("cursor targetTool is aliased to codex", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "cursor" });
+    expect(p!.meta.targetTool).toBe("codex");
   });
 });

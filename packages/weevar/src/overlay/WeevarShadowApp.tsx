@@ -11,6 +11,7 @@ import { pushPauseHostAnimations } from "../engine/animationPause";
 import { autoScrollForPoint } from "../engine/autoScroll";
 import {
   WEEVAR_BOOT_DOT_CLASS,
+  blurWeevarOverlayFocusIfPointerOutside,
   hitTestHostPage,
   isInsideWeevarOverlay,
 } from "../engine/hitTest";
@@ -23,10 +24,11 @@ import type {
   BatchedChange,
   ElementIdentity,
   GeneratedPrompt,
-  LayoutChange,
   MoveSession,
   PromptLength,
+  StyleTweak,
   TargetTool,
+  WeevarChange,
   WeevarRuntimeConfig,
 } from "../engine/layoutTypes";
 import { elementChildren } from "../engine/elementChildren";
@@ -43,7 +45,15 @@ import {
   parentSupportsFlexOrderPreview,
 } from "../engine/reorderTarget";
 import { resolveElementIdentity } from "../engine/resolveIdentity";
+import {
+  classifyElement,
+  areStyleCommitValuesEquivalent,
+  cssPaintProperty,
+  cssPaintValuesEqual,
+  readBorderValues,
+} from "../engine/styleEngine";
 import { weevarVersionLabel } from "../version";
+import { EditTray } from "./EditTray";
 import { OVERLAY_CSS } from "./overlayStyles";
 import { PromptPanel } from "./PromptPanel";
 
@@ -79,7 +89,7 @@ type DragSession = {
 };
 
 type PanelState = {
-  change: LayoutChange;
+  change: WeevarChange;
   prompt: GeneratedPrompt;
   len: PromptLength;
   tool: TargetTool;
@@ -119,7 +129,43 @@ function identityBadgeKey(id: ElementIdentity): string {
   return `el:${name}|${id.tag}|${cls}|${txt}|hash:${id.contentHash}`;
 }
 
-function mergePromptChange(base: LayoutChange, next: LayoutChange): LayoutChange {
+/** Restore inline styles to the captured "from" snapshot (handles rgb vs hex for colours). */
+function revertStyleTweakToFromVisual(hel: HTMLElement, changes: StyleTweak["changes"]): void {
+  for (const c of changes) {
+    hel.style.removeProperty(c.cssProperty);
+    if (!c.fromValue) continue;
+    const cascaded = getComputedStyle(hel).getPropertyValue(c.cssProperty).trim();
+    const same = cssPaintProperty(c.cssProperty)
+      ? cssPaintValuesEqual(cascaded, c.fromValue)
+      : cascaded === c.fromValue;
+    if (!same) hel.style.setProperty(c.cssProperty, c.fromValue);
+  }
+}
+
+function mergePromptChange(base: WeevarChange, next: WeevarChange): WeevarChange {
+  // StyleTweak + StyleTweak → merge property changes, preserve earliest fromValue per property
+  if (base.kind === "style-tweak" && next.kind === "style-tweak") {
+    const merged = new Map<string, typeof base.changes[0]>();
+    for (const c of base.changes) merged.set(c.cssProperty, c);
+    for (const c of next.changes) {
+      const existing = merged.get(c.cssProperty);
+      merged.set(c.cssProperty, {
+        ...c,
+        // Keep the earliest "from" so the prompt shows the full range of change
+        fromValue: existing?.fromValue ?? c.fromValue,
+      });
+    }
+    return {
+      ...next,
+      target: base.target,
+      changes: Array.from(merged.values()),
+      borderSummary: next.borderSummary ?? base.borderSummary,
+    } as WeevarChange;
+  }
+
+  // StyleTweak + LayoutChange or vice versa — cannot be merged into one, return next as-is
+  // compressSessionForPrompt handles the mixed case separately below
+  if (base.kind === "style-tweak" || next.kind === "style-tweak") return next;
   if (next.kind === "move") {
     if (base.kind === "move") {
       return {
@@ -177,13 +223,35 @@ function compressSessionForPrompt(session: MoveSession): MoveSession {
     }
     const prev = out[idx];
     if (!prev) continue;
-    out[idx] = {
-      ...entry,
-      ordinal: prev.ordinal,
-      change: mergePromptChange(prev.change, entry.change),
-      badgeAnchor: prev.badgeAnchor,
-      capturedAt: prev.capturedAt,
-    };
+
+    if (prev.change.kind === "style-tweak" && entry.change.kind === "style-tweak") {
+      // Both are style tweaks — merge property arrays using mergePromptChange
+      out[idx] = {
+        ...entry,
+        ordinal: prev.ordinal,
+        change: mergePromptChange(prev.change, entry.change),
+        badgeAnchor: prev.badgeAnchor,
+        capturedAt: prev.capturedAt,
+      };
+    } else if (
+      prev.change.kind !== "style-tweak" &&
+      entry.change.kind !== "style-tweak"
+    ) {
+      // Both are layout changes — existing merge logic
+      out[idx] = {
+        ...entry,
+        ordinal: prev.ordinal,
+        change: mergePromptChange(prev.change, entry.change),
+        badgeAnchor: prev.badgeAnchor,
+        capturedAt: prev.capturedAt,
+      };
+    } else {
+      // Mixed kinds (layout + style or style + layout) — keep both as separate entries
+      // Each will become its own numbered section in the batched prompt
+      out.push({ ...entry });
+      // Update the index map so further entries for this element append after the latest
+      byTarget.set(identityBadgeKey(entry.change.target), out.length - 1);
+    }
   }
   const changes = out.map((c, i) => ({ ...c, ordinal: i + 1 }));
   return { ...session, changes };
@@ -263,6 +331,7 @@ export function WeevarShadowApp({
   const DOCK_WIDTH = 50;
   const DOCK_HEIGHT = 340;
   const TRIGGER_SIZE = 50;
+  const DOCK_VIEWPORT_INSET = 24;
   const TRIGGER_OFFSET_Y = DOCK_HEIGHT - TRIGGER_SIZE; // close button aligns with trigger button area
 
   type DockPos = { left: number; top: number };
@@ -276,16 +345,16 @@ export function WeevarShadowApp({
   }, []);
 
   const getDefaultDockPos = useCallback((): DockPos => {
-    if (typeof window === "undefined") return { left: 0, top: 0 };
-    // matches CSS right:20 bottom:20 for the dock (with width 50, height ~302).
+    if (typeof window === "undefined") return { left: 0, top: DOCK_VIEWPORT_INSET };
+    const w = window.innerWidth;
     return {
-      left: window.innerWidth - 20 - DOCK_WIDTH,
-      top: window.innerHeight - 20 - DOCK_HEIGHT,
+      left: Math.max(0, w - DOCK_WIDTH - DOCK_VIEWPORT_INSET),
+      top: DOCK_VIEWPORT_INSET,
     };
   }, []);
 
   const [dockPos, setDockPos] = useState<DockPos>(() => getDefaultDockPos());
-  const [triggerAtTop, setTriggerAtTop] = useState(false);
+  const [triggerAtTop, setTriggerAtTop] = useState(true);
   const dockRef = useRef<HTMLDivElement | null>(null);
   const triggerBtnRef = useRef<HTMLButtonElement | null>(null);
   const dockDragRef = useRef<
@@ -595,7 +664,7 @@ export function WeevarShadowApp({
     cancelDrag();
   }, [sessionOn, activeTool, cancelDrag]);
 
-  const appendBatchedChange = useCallback((change: LayoutChange, refs: RuntimeChangeRefs) => {
+  const appendBatchedChange = useCallback((change: WeevarChange, refs: RuntimeChangeRefs) => {
     setRedoChanges([]);
     setMoveSession((prev) => {
       const base: MoveSession = prev ?? { changes: [], startedAt: Date.now() };
@@ -617,13 +686,63 @@ export function WeevarShadowApp({
     });
   }, []);
 
+  const onStyleCommit = useCallback(
+    (
+      el: Element,
+      cssProperty: string,
+      displayLabel: string,
+      fromValue: string,
+      toValue: string,
+    ) => {
+      if (!el) return;
+      if (areStyleCommitValuesEquivalent(cssProperty, fromValue, toValue)) return;
+      const identity = buildElementIdentity(el);
+      const category = classifyElement(el);
+      const borderCssProps = new Set(["border-width", "border-style", "border-color"]);
+      let borderSummary: string | undefined;
+      if (borderCssProps.has(cssProperty)) {
+        const b = readBorderValues(el);
+        if (b.style !== "none" && b.style !== "hidden") {
+          borderSummary = `type ${b.style}, weight ${b.width}px, colour ${b.color}`;
+        }
+      }
+      const change: StyleTweak = {
+        kind: "style-tweak",
+        target: identity,
+        elementCategory: category,
+        changes: [{ cssProperty, displayLabel, fromValue, toValue }],
+        ...(borderSummary ? { borderSummary } : {}),
+      };
+      appendBatchedChange(change, {
+        target: el,
+        fromParent: el.parentElement ?? el,
+        toParent: el.parentElement ?? el,
+      });
+    },
+    [appendBatchedChange],
+  );
+
   const dismissAllTrays = useCallback(() => {
     setPromptOpen(false);
     setSettingsOpen(false);
     setTraysDismissed(true);
   }, []);
 
-  const applyChangeToDom = useCallback((change: LayoutChange, refs?: RuntimeChangeRefs) => {
+  const applyChangeToDom = useCallback((change: WeevarChange, refs?: RuntimeChangeRefs) => {
+    if (change.kind === "style-tweak") {
+      const el = refs?.target ?? resolveElementIdentity(change.target);
+      if (!el) return null;
+      const hel = el as HTMLElement;
+      for (const c of change.changes) {
+        hel.style.setProperty(c.cssProperty, c.toValue);
+      }
+      return {
+        revert: () => {
+          revertStyleTweakToFromVisual(hel, change.changes);
+        },
+        disconnect: () => {},
+      };
+    }
     if (change.kind === "reorder") {
       const parent = refs?.toParent ?? resolveElementIdentity(change.parent);
       const target = refs?.target ?? resolveElementIdentity(change.target);
@@ -647,7 +766,27 @@ export function WeevarShadowApp({
     return createPendingCrossMove(target, currentParent, toParent, ordered);
   }, []);
 
-  const applyInverseChangeToDom = useCallback((change: LayoutChange, refs?: RuntimeChangeRefs) => {
+  const applyInverseChangeToDom = useCallback((change: WeevarChange, refs?: RuntimeChangeRefs) => {
+    if (change.kind === "style-tweak") {
+      const el = refs?.target ?? resolveElementIdentity(change.target);
+      if (!el) return null;
+      const hel = el as HTMLElement;
+
+      const applyFrom = () => {
+        revertStyleTweakToFromVisual(hel, change.changes);
+      };
+
+      applyFrom();
+
+      return {
+        revert: () => {
+          for (const c of change.changes) {
+            hel.style.setProperty(c.cssProperty, c.toValue);
+          }
+        },
+        disconnect: () => {},
+      };
+    }
     if (change.kind === "reorder") {
       const parent = refs?.fromParent ?? resolveElementIdentity(change.parent);
       const target = refs?.target ?? resolveElementIdentity(change.target);
@@ -804,7 +943,7 @@ export function WeevarShadowApp({
     // Prevent observer accumulation across multiple drops.
     disposePending(false);
 
-    let change: LayoutChange;
+    let change: WeevarChange;
     if (dropParent === sourceParent) {
       const ordered = orderAfterMove(sourceParent, dragged, dropIndex);
       pendingRef.current = createPendingReorder(sourceParent, ordered);
@@ -905,6 +1044,18 @@ export function WeevarShadowApp({
     };
   }, [sessionOn]);
 
+  /** While the overlay is active, Escape is ignored (no tray dismiss, no in-tray cancel). */
+  useEffect(() => {
+    if (!sessionOn || disabled) return;
+    const swallowEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    document.addEventListener("keydown", swallowEscape, { capture: true });
+    return () => document.removeEventListener("keydown", swallowEscape, { capture: true });
+  }, [sessionOn, disabled]);
+
   useEffect(() => {
     if (!sessionOn || disabled || activeTool !== "pointer") return;
     const clearForcedCursorTarget = () => {
@@ -964,6 +1115,7 @@ export function WeevarShadowApp({
     const onPointerDownCapture = (e: PointerEvent) => {
       if (dragSessionRef.current) return;
       if (promptOpen) return;
+      blurWeevarOverlayFocusIfPointerOutside(e);
       if (pointerOverWeevarChrome(e)) return;
       const el = hitTestHostPage(e.clientX, e.clientY);
       if (!el) {
@@ -982,38 +1134,6 @@ export function WeevarShadowApp({
       bump();
     };
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      const t = e.target;
-      if (t instanceof HTMLElement) {
-        if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
-          return;
-      }
-      if (promptOpen) {
-        e.preventDefault();
-        e.stopPropagation();
-        dismissAllTrays();
-        setPanel(null);
-        bump();
-        return;
-      }
-      if (dragSessionRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        cancelDrag();
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      if (selectedRef.current) {
-        selectedRef.current = null;
-        selectedIdentityRef.current = null;
-        bump();
-        return;
-      }
-      setSessionOn(false);
-    };
-
     document.addEventListener("pointermove", onPointerMove, {
       capture: true,
       passive: true,
@@ -1022,7 +1142,6 @@ export function WeevarShadowApp({
       capture: true,
       passive: false,
     });
-    document.addEventListener("keydown", onKeyDown, { capture: true });
     const onWindowMouseLeave = () => {
       setPointerInPage(false);
       setPointerPos(null);
@@ -1048,7 +1167,6 @@ export function WeevarShadowApp({
       document.removeEventListener("pointerdown", onPointerDownCapture, {
         capture: true,
       });
-      document.removeEventListener("keydown", onKeyDown, { capture: true });
       window.removeEventListener("mouseleave", onWindowMouseLeave, true);
       window.removeEventListener("blur", onWindowBlur, true);
       window.removeEventListener("mouseenter", onWindowMouseEnter, true);
@@ -1057,12 +1175,9 @@ export function WeevarShadowApp({
     sessionOn,
     disabled,
     activeTool,
-    setSessionOn,
     bump,
     promptOpen,
-    cancelDrag,
     setTraysDismissed,
-    dismissAllTrays,
   ]);
 
   useEffect(() => {
@@ -1268,78 +1383,6 @@ body *:focus {
     };
   }, [selectedEl, promptOpen, rev, activeTool]);
 
-  const pointerPathDisplay = useMemo(() => {
-    if (!pointerSelectionInfo) return "";
-    return pointerSelectionInfo.path.replaceAll(">", "›");
-  }, [pointerSelectionInfo]);
-
-  const pointerCssProps = useMemo(() => {
-    if (!selectedEl || activeTool !== "pointer") return [] as Array<{ key: string; value: string }>;
-    const cs = window.getComputedStyle(selectedEl);
-    const tag = selectedEl.tagName.toLowerCase();
-    const hasDirectReadableText = Array.from(selectedEl.childNodes).some(
-      (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim().length > 0,
-    );
-    const isTextLikeTag = [
-      "p",
-      "span",
-      "a",
-      "label",
-      "small",
-      "strong",
-      "em",
-      "b",
-      "i",
-      "h1",
-      "h2",
-      "h3",
-      "h4",
-      "h5",
-      "h6",
-      "li",
-      "blockquote",
-      "code",
-      "pre",
-      "button",
-      "input",
-      "textarea",
-    ].includes(tag);
-    const isTextSelection = isTextLikeTag || hasDirectReadableText;
-
-    const textKeys = [
-      "color",
-      "font-size",
-      "font-weight",
-      "font-family",
-      "line-height",
-      "letter-spacing",
-      "text-align",
-      "text-transform",
-      "text-decoration-line",
-      "text-decoration-color",
-      "white-space",
-    ];
-    const visualKeys = [
-      "background-color",
-      "color",
-      "border-color",
-      "border-width",
-      "border-radius",
-      "box-shadow",
-      "opacity",
-      "display",
-      "position",
-      "width",
-      "height",
-      "padding",
-      "margin",
-    ];
-    const keys = isTextSelection ? textKeys : visualKeys;
-    return keys
-      .map((key) => ({ key, value: cs.getPropertyValue(key).trim() }))
-      .filter((entry) => entry.value.length > 0 && entry.value !== "normal");
-  }, [selectedEl, activeTool, rev]);
-
 
   const visibleBadges = useMemo((): BadgeRender[] => {
     void badgeTick;
@@ -1382,6 +1425,9 @@ body *:focus {
     !showSettingsTray &&
     (activeTool === "summary" || (activeTool === "pointer" && pointerSelectionInfo));
   const trayAnyOpen = showSummaryTray || showSettingsTray || showPromptTray;
+  /** Taller tray shell only when the pointer selection EditTray is the visible summary tray. */
+  const editSelectionTrayVisible =
+    showSummaryTray && activeTool === "pointer" && pointerSelectionInfo != null;
   const trayStyle = useMemo((): CSSProperties => {
     const trayWidth = 250;
     const gap = 8;
@@ -1493,13 +1539,6 @@ body *:focus {
       }
 
       const k = e.key.toLowerCase();
-      if (k === "escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        cancelDrag();
-        setSessionOn(false);
-        return;
-      }
       if (k === "p") {
         e.preventDefault();
         e.stopPropagation();
@@ -1626,8 +1665,8 @@ body *:focus {
                   type="button"
                   className="wv-toolbar-close"
                   aria-label="Close overlay"
-                  onMouseEnter={(e) => showToolbarTooltip("Close (Esc)", e)}
-                  onMouseMove={(e) => moveToolbarTooltip("Close (Esc)", e)}
+                  onMouseEnter={(e) => showToolbarTooltip("Close overlay", e)}
+                  onMouseMove={(e) => moveToolbarTooltip("Close overlay", e)}
                   onMouseLeave={hideToolbarTooltip}
                   onClick={() => {
                     cancelDrag();
@@ -1749,8 +1788,8 @@ body *:focus {
                   type="button"
                   className="wv-toolbar-close"
                   aria-label="Close overlay"
-                  onMouseEnter={(e) => showToolbarTooltip("Close (Esc)", e)}
-                  onMouseMove={(e) => moveToolbarTooltip("Close (Esc)", e)}
+                  onMouseEnter={(e) => showToolbarTooltip("Close overlay", e)}
+                  onMouseMove={(e) => moveToolbarTooltip("Close overlay", e)}
                   onMouseLeave={hideToolbarTooltip}
                   onClick={() => {
                     cancelDrag();
@@ -1763,7 +1802,10 @@ body *:focus {
             </div>
 
             {trayAnyOpen ? (
-              <div className="wv-tray-stack" style={trayStyle}>
+              <div
+                className={`wv-tray-stack${editSelectionTrayVisible ? " wv-tray-stack--edit" : ""}`}
+                style={trayStyle}
+              >
                 <div
                   className={`wv-tray-stack-layer${showSummaryTray ? " wv-tray-stack-layer--visible" : ""}`}
                   aria-hidden={!showSummaryTray}
@@ -1811,7 +1853,7 @@ body *:focus {
                                   <span className="wv-overview-orb wv-overview-orb--moved">
                                     <span className="wv-overview-orb-value">{movedElementCount}</span>
                                   </span>
-                                  <span className="wv-overview-label">Total moved</span>
+                                  <span className="wv-overview-label">Total edits</span>
                                 </div>
                                 <span className="wv-overview-divider" aria-hidden />
                                 <div className="wv-overview-stat">
@@ -1841,25 +1883,13 @@ body *:focus {
                           </div>
                         </>
                       ) : pointerSelectionInfo ? (
-                        <>
-                          <div className="wv-tray-card wv-selection-path-card">
-                            <span className="wv-selection-path-text">{pointerPathDisplay}</span>
-                          </div>
-                          <div className="wv-tray-card wv-selection-css-card">
-                            <div className="wv-selection-css-scroll-wrap">
-                              <div className="wv-selection-css-scroll">
-                                {pointerCssProps.map((entry) => (
-                                  <div key={entry.key} className="wv-selection-css-line">
-                                    <span className="wv-selection-css-key">{entry.key}</span>
-                                    <span className="wv-selection-css-sep">: </span>
-                                    <span className="wv-selection-css-value">{entry.value}</span>
-                                    <span className="wv-selection-css-sep">;</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </>
+                        <EditTray
+                          element={selectedEl}
+                          onStyleCommit={onStyleCommit}
+                          onClose={dismissAllTrays}
+                          hidden={traysDismissed}
+                          tailwindEnabled={config?.prompts?.tailwindVerbatimClasses ?? false}
+                        />
                       ) : null}
                     </div>
                     <div className="wv-tray-foot">
@@ -2141,10 +2171,18 @@ function SettingsTray({
 }
 
 function eventFromWeevarChrome(e: PointerEvent | KeyboardEvent): boolean {
-  return e.composedPath().some((n) => {
-    if (!(n instanceof Element)) return false;
-    return isInsideWeevarOverlay(n);
-  });
+  const path = e.composedPath();
+  if (
+    path.some((n) => {
+      if (!(n instanceof Element)) return false;
+      return isInsideWeevarOverlay(n);
+    })
+  ) {
+    return true;
+  }
+  // Closed shadow + some targets: composedPath can omit inner nodes; retargeted target may still be the host.
+  const t = e.target;
+  return t instanceof Element && isInsideWeevarOverlay(t);
 }
 
 /** True when coordinates hit Weevar UI (dock, trays, etc.), not the host page. */
