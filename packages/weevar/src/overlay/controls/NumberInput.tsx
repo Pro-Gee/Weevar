@@ -20,6 +20,8 @@ type NumberInputProps = {
   /** Called on Escape so the parent can revert live preview without logging history. */
   onCancel?: () => void;
   disabled?: boolean;
+  /** Card row styling for typography fields (Figma tray). */
+  variant?: "default" | "card";
 };
 
 export function NumberInput({
@@ -34,7 +36,9 @@ export function NumberInput({
   onFocus,
   onCancel,
   disabled = false,
+  variant = "default",
 }: NumberInputProps) {
+  const cardClass = variant === "card" ? " wv-number-input--card" : "";
   const [editing, setEditing] = useState(false);
   const [raw, setRaw] = useState(String(value));
   const fromRef = useRef<string>(`${value}${unit}`);
@@ -115,7 +119,7 @@ export function NumberInput({
     return (
       <input
         type="text"
-        className="wv-number-input wv-pe"
+        className={`wv-number-input wv-pe${cardClass}`}
         value={editing ? raw : format(value)}
         aria-label={displayLabel}
         disabled={disabled}
@@ -125,10 +129,10 @@ export function NumberInput({
   }
 
   return (
-    <div className="wv-number-input-wrap wv-pe">
+    <div className={`wv-number-input-wrap wv-pe${cardClass}`}>
       <input
         type="text"
-        className="wv-number-input wv-pe"
+        className={`wv-number-input wv-pe${cardClass}`}
         value={editing ? raw : String(value)}
         aria-label={displayLabel}
         disabled={disabled}

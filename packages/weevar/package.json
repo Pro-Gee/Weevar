@@ -75,7 +75,8 @@
     "@babel/core": "^7.26.0",
     "@babel/preset-react": "^7.26.3",
     "@babel/preset-typescript": "^7.26.0",
-    "@babel/types": "^7.26.3"
+    "@babel/types": "^7.26.3",
+    "react-colorful": "^5.7.0"
   },
   "devDependencies": {
     "@swc/core": "^1.15.33",

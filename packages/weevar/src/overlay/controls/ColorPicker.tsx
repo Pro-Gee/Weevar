@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import {
+  alphaPercentFromPickerColor,
+  combineOpaqueHexAndAlphaPercent,
+  cssPaintValuesEqual,
+  opaqueHexFromPickerColor,
+  parsePickerColorValue,
+} from "../../engine/styleEngine";
 
 type ColorPickerProps = {
-  /** Current colour as a hex string e.g. "#ff0000". Always pass hex — use rgbToHex from styleEngine before passing. */
+  /** Full picker value: `#rrggbb` or `#rrggbbaa` (from readCssColorForPicker). */
   value: string;
   /** Live preview; `styleTarget` keeps preview on the node that opened the native picker after selection moves. */
   onChange: (hex: string, styleTarget: Element) => void;
@@ -9,24 +16,83 @@ type ColorPickerProps = {
    * Called when a colour choice is finalized: once per native picker session when the OS modal
    * goes away for any reason (OK, outside click, focus elsewhere, tray unmount), or when the hex
    * field blurs / Enter. Dragging inside the system picker only updates preview via onChange.
-   * `commitTarget` is the DOM node that received the edit (snapshotted when the native picker opens
-   * so commits still attribute to that node after pointer selection moves to another element).
-   * `fromSnapshotHex` is the tray colour when the native session started — use as the "from" baseline
-   * so commits still log after preview (computed style on the target would otherwise match the new value).
    */
   onCommit: (hex: string, commitTarget: Element, fromSnapshotHex?: string) => void;
-  /** Element whose styles this row edits (same as EditTray `element`). */
   styleCommitTarget: Element;
-  /** When this value changes (e.g. EditTray `element` / new pointer selection), finalize any open native colour session. */
   selectionDismissSignal?: unknown;
-  /** Called on first interaction so the parent can record the "from" value. */
   onFocus?: () => void;
-  /** When true, swatch and hex field are inert (e.g. border style is "none"). */
   disabled?: boolean;
+  variant?: "default" | "card";
+  /** First-row label when `variant="card"` (e.g. Font, Colour). */
+  cardLabel?: string;
 };
 
-function isValidHex(s: string): boolean {
+function isValidOpaqueHex(s: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(s);
+}
+
+function isValidFullHex(s: string): boolean {
+  return /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(s);
+}
+
+function formatAlphaPercent(n: number): string {
+  const rounded = Math.round(n * 100) / 100;
+  return rounded % 1 === 0 ? String(rounded) : rounded.toFixed(2);
+}
+
+function parseAlphaPercentInput(raw: string): number | null {
+  const t = raw.trim().replace(/%$/, "");
+  if (t === "") return null;
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null;
+}
+
+// Figma-style alpha grid: light squares on a slightly darker base.
+const SWATCH_CHECKER_LIGHT = "#dcdcdc";
+const SWATCH_CHECKER_DARK = "#a8a8a8";
+
+function alphaGridLayers(swatchPx: number): Pick<
+  CSSProperties,
+  "backgroundColor" | "backgroundImage" | "backgroundSize" | "backgroundPosition" | "backgroundRepeat"
+> {
+  // Right half = 2 columns; full height = 4 rows (see Figma 16×16 swatch).
+  const cell = swatchPx / 4;
+  const tile = `${cell}px ${cell}px`;
+  const offset = `${cell / 2}px ${cell / 2}px`;
+  return {
+    backgroundColor: SWATCH_CHECKER_LIGHT,
+    backgroundImage: [
+      `linear-gradient(45deg, ${SWATCH_CHECKER_DARK} 25%, transparent 25%, transparent 75%, ${SWATCH_CHECKER_DARK} 75%, ${SWATCH_CHECKER_DARK})`,
+      `linear-gradient(45deg, ${SWATCH_CHECKER_DARK} 25%, transparent 25%, transparent 75%, ${SWATCH_CHECKER_DARK} 75%, ${SWATCH_CHECKER_DARK})`,
+    ].join(", "),
+    backgroundSize: `${tile}, ${tile}`,
+    backgroundPosition: `0 0, ${offset}`,
+    backgroundRepeat: "repeat, repeat",
+  };
+}
+
+function swatchStyle(value: string, swatchPx: number): CSSProperties {
+  const { r, g, b, alpha } = parsePickerColorValue(value);
+  const opaque = `rgb(${r}, ${g}, ${b})`;
+
+  if (alpha >= 1) {
+    return { backgroundColor: opaque };
+  }
+
+  const rgba = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const split = `linear-gradient(to right, ${opaque} 50%, ${rgba} 50%)`;
+  const divider =
+    "linear-gradient(to right, transparent calc(50% - 0.5px), rgba(235, 235, 235, 0.12) calc(50% - 0.5px), " +
+    "rgba(235, 235, 235, 0.12) calc(50% + 0.5px), transparent calc(50% + 0.5px))";
+  const grid = alphaGridLayers(swatchPx);
+
+  return {
+    ...grid,
+    backgroundImage: [divider, split, ...(grid.backgroundImage as string).split(", ")].join(", "),
+    backgroundSize: `100% 100%, 100% 100%, ${grid.backgroundSize}`,
+    backgroundPosition: `0 0, 0 0, ${grid.backgroundPosition}`,
+    backgroundRepeat: `no-repeat, no-repeat, ${grid.backgroundRepeat}`,
+  };
 }
 
 type NativeSession = { active: boolean; finalized: boolean };
@@ -39,42 +105,70 @@ export function ColorPicker({
   selectionDismissSignal,
   styleCommitTarget,
   disabled = false,
+  variant = "default",
+  cardLabel = "Colour",
 }: ColorPickerProps) {
-  const [hexRaw, setHexRaw] = useState(value);
+  const fullValue = isValidFullHex(value) ? value.toLowerCase() : "#000000";
+  const displayOpaqueHex = opaqueHexFromPickerColor(fullValue).toLowerCase();
+  const displayAlphaPercent = alphaPercentFromPickerColor(fullValue);
+
+  const [hexRaw, setHexRaw] = useState(displayOpaqueHex);
+  const [alphaRaw, setAlphaRaw] = useState(formatAlphaPercent(displayAlphaPercent));
   const [editingHex, setEditingHex] = useState(false);
-  /** While true, the native `<input type="color">` is driven only by this state — not by `value` from the tray — so changing selection cannot push another element's colour through React into the picker. */
+  const [editingAlpha, setEditingAlpha] = useState(false);
   const [nativePickerOpen, setNativePickerOpen] = useState(false);
-  const [nativeSessionHex, setNativeSessionHex] = useState(() =>
-    isValidHex(value) ? value : "#000000",
-  );
+  const [nativeSessionHex, setNativeSessionHex] = useState(displayOpaqueHex);
 
   const rowRef = useRef<HTMLDivElement>(null);
   const nativeInputRef = useRef<HTMLInputElement>(null);
   const didFocusRef = useRef(false);
   const onCommitRef = useRef(onCommit);
   onCommitRef.current = onCommit;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const styleCommitTargetRef = useRef(styleCommitTarget);
   styleCommitTargetRef.current = styleCommitTarget;
-  /** Node that opened the native picker; used when selection moves before finalize. */
   const sessionCommitTargetRef = useRef<Element | null>(null);
-  /** Colour at native session start (`safeValue` on swatch click) for commit diff vs live preview. */
   const sessionFromHexRef = useRef<string | null>(null);
-  /** Hex when the text field gained focus — blur/Enter without change must not commit. */
-  const hexFieldBaselineRef = useRef<string>("");
+  const sessionOpaqueBaselineRef = useRef("#000000");
+  const sessionAlphaPercentRef = useRef(100);
+  const userDidChangeNativeRef = useRef(false);
+  const hexFieldBaselineRef = useRef("");
+  const alphaFieldBaselineRef = useRef("");
+
+  function revertNativePreview() {
+    const fromSnap = sessionFromHexRef.current;
+    const target = sessionCommitTargetRef.current ?? styleCommitTargetRef.current;
+    if (fromSnap != null) {
+      onChangeRef.current(fromSnap, target);
+    }
+  }
+
+  function finishNativeSessionWithoutCommit() {
+    revertNativePreview();
+    sessionCommitTargetRef.current = null;
+    sessionFromHexRef.current = null;
+    userDidChangeNativeRef.current = false;
+    setNativePickerOpen(false);
+    didFocusRef.current = false;
+  }
 
   const sessionRef = useRef<NativeSession>({ active: false, finalized: true });
-  const lastPreviewHexRef = useRef("#000000");
+  const lastPreviewHexRef = useRef(fullValue);
   const sawWindowBlurDuringPickerRef = useRef(false);
   const removeDismissListenersRef = useRef<(() => void) | null>(null);
   const endNativePickerSessionRef = useRef<() => void>(() => {});
 
-  const safeValue = isValidHex(value) ? value : "#000000";
-  const nativeInputValue = nativePickerOpen ? nativeSessionHex : safeValue;
+  const nativeInputValue = nativePickerOpen ? nativeSessionHex : displayOpaqueHex;
+  const previewFullValue = combineOpaqueHexAndAlphaPercent(
+    nativePickerOpen ? nativeSessionHex : displayOpaqueHex,
+    nativePickerOpen ? sessionAlphaPercentRef.current : displayAlphaPercent,
+  );
 
   useEffect(() => {
     if (nativePickerOpen || sessionRef.current.active) return;
-    lastPreviewHexRef.current = safeValue;
-  }, [safeValue, nativePickerOpen]);
+    lastPreviewHexRef.current = fullValue;
+  }, [fullValue, nativePickerOpen]);
 
   function detachDismissListeners() {
     removeDismissListenersRef.current?.();
@@ -87,20 +181,32 @@ export function ColorPicker({
     s.finalized = true;
     s.active = false;
     detachDismissListeners();
-    const el = nativeInputRef.current;
-    let hex = lastPreviewHexRef.current;
-    if (el?.value && isValidHex(el.value)) hex = el.value;
-    if (!isValidHex(hex)) hex = "#000000";
     const target = sessionCommitTargetRef.current ?? styleCommitTargetRef.current;
-    sessionCommitTargetRef.current = null;
     const fromSnap = sessionFromHexRef.current;
+
+    if (!userDidChangeNativeRef.current) {
+      finishNativeSessionWithoutCommit();
+      return;
+    }
+
+    const el = nativeInputRef.current;
+    let combined = lastPreviewHexRef.current;
+    if (el?.value && isValidOpaqueHex(el.value)) {
+      combined = combineOpaqueHexAndAlphaPercent(el.value, sessionAlphaPercentRef.current);
+    } else if (!isValidFullHex(combined)) {
+      combined = combineOpaqueHexAndAlphaPercent("#000000", sessionAlphaPercentRef.current);
+    }
+
+    sessionCommitTargetRef.current = null;
     sessionFromHexRef.current = null;
-    if (fromSnap != null && hex.toLowerCase() === fromSnap.toLowerCase()) {
+    userDidChangeNativeRef.current = false;
+    if (fromSnap != null && cssPaintValuesEqual(combined, fromSnap)) {
+      revertNativePreview();
       setNativePickerOpen(false);
       didFocusRef.current = false;
       return;
     }
-    onCommitRef.current(hex, target, fromSnap ?? undefined);
+    onCommitRef.current(combined, target, fromSnap ?? undefined);
     setNativePickerOpen(false);
     didFocusRef.current = false;
   }
@@ -186,8 +292,10 @@ export function ColorPicker({
     [],
   );
 
-  // Sync display when value changes externally (e.g. undo)
-  if (!editingHex && hexRaw !== value) setHexRaw(value);
+  if (!editingHex && hexRaw !== displayOpaqueHex) setHexRaw(displayOpaqueHex);
+  if (!editingAlpha && alphaRaw !== formatAlphaPercent(displayAlphaPercent)) {
+    setAlphaRaw(formatAlphaPercent(displayAlphaPercent));
+  }
 
   const triggerFocus = () => {
     if (!didFocusRef.current) {
@@ -196,105 +304,213 @@ export function ColorPicker({
     }
   };
 
-  return (
-    <div ref={rowRef} className={`wv-color-row wv-pe${disabled ? " wv-color-row--disabled" : ""}`}>
-      {/* Colour swatch — clicking opens the native colour picker */}
+  const previewWithOpaqueAndAlpha = (opaque: string, alphaPercent: number) =>
+    combineOpaqueHexAndAlphaPercent(opaque, alphaPercent);
+
+  const openNativePicker = () => {
+    if (disabled) return;
+    triggerFocus();
+    sawWindowBlurDuringPickerRef.current = false;
+    userDidChangeNativeRef.current = false;
+    sessionOpaqueBaselineRef.current = displayOpaqueHex;
+    sessionAlphaPercentRef.current = displayAlphaPercent;
+    sessionRef.current = { active: true, finalized: false };
+    sessionCommitTargetRef.current = styleCommitTargetRef.current;
+    sessionFromHexRef.current = fullValue;
+    lastPreviewHexRef.current = fullValue;
+    setNativeSessionHex(displayOpaqueHex);
+    setNativePickerOpen(true);
+    queueMicrotask(() => {
+      if (sessionRef.current.active && !sessionRef.current.finalized) {
+        attachDismissListeners();
+        nativeInputRef.current?.click();
+      }
+    });
+  };
+
+  const onNativeInputChange = (hex: string) => {
+    if (!nativePickerOpen) return;
+    if (hex.toLowerCase() === sessionOpaqueBaselineRef.current.toLowerCase()) return;
+    userDidChangeNativeRef.current = true;
+    setNativeSessionHex(hex);
+    setHexRaw(hex);
+    const combined = previewWithOpaqueAndAlpha(hex, sessionAlphaPercentRef.current);
+    lastPreviewHexRef.current = combined;
+    const previewEl = sessionCommitTargetRef.current ?? styleCommitTargetRef.current;
+    onChange(combined, previewEl);
+  };
+
+  const hexInputProps = {
+    value: editingHex ? hexRaw : displayOpaqueHex,
+    disabled,
+    maxLength: 7,
+    spellCheck: false as const,
+    onFocus: () => {
+      triggerFocus();
+      setEditingHex(true);
+      setHexRaw(displayOpaqueHex);
+      hexFieldBaselineRef.current = displayOpaqueHex.toLowerCase();
+    },
+    onChange: (raw: string) => {
+      setHexRaw(raw);
+      if (isValidOpaqueHex(raw)) {
+        onChange(
+          previewWithOpaqueAndAlpha(raw, displayAlphaPercent),
+          styleCommitTargetRef.current,
+        );
+      }
+    },
+    onBlur: () => {
+      setEditingHex(false);
+      const raw = hexRaw.trim();
+      if (isValidOpaqueHex(raw)) {
+        const combined = previewWithOpaqueAndAlpha(raw, displayAlphaPercent);
+        if (raw.toLowerCase() !== hexFieldBaselineRef.current) {
+          onCommitRef.current(combined, styleCommitTargetRef.current);
+        }
+      } else {
+        setHexRaw(displayOpaqueHex);
+      }
+      didFocusRef.current = false;
+    },
+    onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        setEditingHex(false);
+        if (isValidOpaqueHex(hexRaw.trim())) {
+          const raw = hexRaw.trim();
+          const combined = previewWithOpaqueAndAlpha(raw, displayAlphaPercent);
+          if (raw.toLowerCase() !== hexFieldBaselineRef.current) {
+            onCommitRef.current(combined, styleCommitTargetRef.current);
+          }
+        } else {
+          setHexRaw(displayOpaqueHex);
+        }
+      }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setEditingHex(false);
+        setHexRaw(displayOpaqueHex);
+      }
+    },
+  };
+
+  const alphaInputProps = {
+    inputMode: "decimal" as const,
+    value: editingAlpha ? alphaRaw : formatAlphaPercent(displayAlphaPercent),
+    disabled,
+    maxLength: 6,
+    spellCheck: false as const,
+    onFocus: () => {
+      triggerFocus();
+      setEditingAlpha(true);
+      setAlphaRaw(formatAlphaPercent(displayAlphaPercent));
+      alphaFieldBaselineRef.current = formatAlphaPercent(displayAlphaPercent);
+    },
+    onChange: (raw: string) => {
+      setAlphaRaw(raw);
+      const pct = parseAlphaPercentInput(raw);
+      if (pct != null) {
+        onChange(
+          previewWithOpaqueAndAlpha(displayOpaqueHex, pct),
+          styleCommitTargetRef.current,
+        );
+      }
+    },
+    onBlur: () => {
+      setEditingAlpha(false);
+      const pct = parseAlphaPercentInput(alphaRaw);
+      if (pct != null) {
+        const combined = previewWithOpaqueAndAlpha(displayOpaqueHex, pct);
+        if (formatAlphaPercent(pct) !== alphaFieldBaselineRef.current) {
+          onCommitRef.current(combined, styleCommitTargetRef.current);
+        }
+      } else {
+        setAlphaRaw(formatAlphaPercent(displayAlphaPercent));
+      }
+      didFocusRef.current = false;
+    },
+    onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        setEditingAlpha(false);
+        const pct = parseAlphaPercentInput(alphaRaw);
+        if (pct != null) {
+          const combined = previewWithOpaqueAndAlpha(displayOpaqueHex, pct);
+          if (formatAlphaPercent(pct) !== alphaFieldBaselineRef.current) {
+            onCommitRef.current(combined, styleCommitTargetRef.current);
+          }
+        } else {
+          setAlphaRaw(formatAlphaPercent(displayAlphaPercent));
+        }
+      }
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setEditingAlpha(false);
+        setAlphaRaw(formatAlphaPercent(displayAlphaPercent));
+      }
+    },
+  };
+
+  const nativeColorInput = (
+    <input
+      ref={nativeInputRef}
+      type="color"
+      className="wv-color-native wv-pe"
+      value={nativeInputValue}
+      disabled={disabled}
+      onChange={(e) => onNativeInputChange(e.target.value)}
+      onBlur={() => endNativePickerSession()}
+    />
+  );
+
+  const swatchPx = variant === "card" ? 16 : 20;
+  const swatchEl = (
+    <div
+      className={`wv-color-swatch wv-pe${variant === "card" ? " wv-color-swatch--card" : ""}`}
+      style={swatchStyle(nativePickerOpen ? previewFullValue : fullValue, swatchPx)}
+      onClick={openNativePicker}
+    />
+  );
+
+  if (variant === "card") {
+    return (
       <div
-        className="wv-color-swatch wv-pe"
-        style={{ background: nativePickerOpen ? nativeSessionHex : safeValue }}
-        onClick={() => {
-          if (disabled) return;
-          triggerFocus();
-          sawWindowBlurDuringPickerRef.current = false;
-          sessionRef.current = { active: true, finalized: false };
-          sessionCommitTargetRef.current = styleCommitTargetRef.current;
-          sessionFromHexRef.current = safeValue;
-          lastPreviewHexRef.current = safeValue;
-          setNativeSessionHex(safeValue);
-          setNativePickerOpen(true);
-          queueMicrotask(() => {
-            if (sessionRef.current.active && !sessionRef.current.finalized) {
-              attachDismissListeners();
-              nativeInputRef.current?.click();
-            }
-          });
-        }}
-      />
+        ref={rowRef}
+        className={`wv-color-card wv-pe${disabled ? " wv-color-card--disabled" : ""}`}
+      >
+        <div className="wv-color-card-row">
+          <span className="wv-color-card-label">{cardLabel}</span>
+          <div className="wv-color-card-value">
+            <input type="text" className="wv-color-card-hex wv-pe" {...hexInputProps} />
+            {swatchEl}
+          </div>
+        </div>
+        <div className="wv-color-card-divider" aria-hidden />
+        <div className="wv-color-card-row">
+          <span className="wv-color-card-label">Fill Opacity</span>
+          <div className="wv-color-card-value">
+            <input type="text" className="wv-color-card-alpha wv-pe" {...alphaInputProps} />
+            <span className="wv-color-card-alpha-unit">%</span>
+          </div>
+        </div>
+        {nativeColorInput}
+      </div>
+    );
+  }
 
-      {/* Native colour input — while the OS modal is open, `value` is session-only (not tray `value`). */}
-      <input
-        ref={nativeInputRef}
-        type="color"
-        className="wv-color-native wv-pe"
-        value={nativeInputValue}
-        disabled={disabled}
-        onChange={(e) => {
-          if (!nativePickerOpen) return;
-          const hex = e.target.value;
-          setNativeSessionHex(hex);
-          setHexRaw(hex);
-          lastPreviewHexRef.current = hex;
-          const previewEl = sessionCommitTargetRef.current ?? styleCommitTargetRef.current;
-          onChange(hex, previewEl);
-        }}
-        onBlur={() => {
-          endNativePickerSession();
-        }}
-      />
-
-      {/* Hex text input — clicking lets the user type a hex value directly */}
-      <input
-        type="text"
-        className="wv-color-hex wv-pe"
-        value={editingHex ? hexRaw : value}
-        disabled={disabled}
-        onFocus={() => {
-          triggerFocus();
-          setEditingHex(true);
-          setHexRaw(value);
-          hexFieldBaselineRef.current = (isValidHex(value) ? value : safeValue).toLowerCase();
-        }}
-        onChange={(e) => {
-          const raw = e.target.value;
-          setHexRaw(raw);
-          if (isValidHex(raw)) {
-            const previewEl = sessionCommitTargetRef.current ?? styleCommitTargetRef.current;
-            onChange(raw, previewEl);
-          }
-        }}
-        onBlur={(e) => {
-          setEditingHex(false);
-          const raw = e.target.value.trim();
-          if (isValidHex(raw)) {
-            if (raw.toLowerCase() !== hexFieldBaselineRef.current) {
-              onCommitRef.current(raw, styleCommitTargetRef.current);
-            }
-          } else {
-            setHexRaw(value); // revert invalid input
-          }
-          didFocusRef.current = false;
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            setEditingHex(false);
-            if (isValidHex(hexRaw)) {
-              if (hexRaw.trim().toLowerCase() !== hexFieldBaselineRef.current) {
-                onCommitRef.current(hexRaw.trim(), styleCommitTargetRef.current);
-              }
-            } else {
-              setHexRaw(value);
-            }
-          }
-          if (e.key === "Escape") {
-            e.stopPropagation();
-            setEditingHex(false);
-            setHexRaw(value);
-          }
-        }}
-        maxLength={7}
-        spellCheck={false}
-      />
+  return (
+    <div
+      ref={rowRef}
+      className={`wv-color-row wv-pe${disabled ? " wv-color-row--disabled" : ""}`}
+    >
+      <input type="text" className="wv-color-hex wv-pe" {...hexInputProps} />
+      <div className="wv-color-alpha-wrap wv-pe">
+        <input type="text" className="wv-color-alpha wv-pe" {...alphaInputProps} />
+        <span className="wv-color-alpha-unit">%</span>
+      </div>
+      {swatchEl}
+      {nativeColorInput}
     </div>
   );
 }

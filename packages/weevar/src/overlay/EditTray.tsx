@@ -2,13 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   areStyleCommitValuesEquivalent,
   classifyElement,
+  elementTypeLabel,
   normalizeFontWeightValue,
   readBorderValues,
   readBoxValues,
   readLineHeightAsPixelNumber,
   readPropertyValue,
   readRadiusValues,
+  readCssColorForPicker,
   rgbToHex,
+  supportsCssBackgroundColor,
 } from "../engine/styleEngine";
 import type { ElementCategory } from "../engine/layoutTypes";
 import { AlignmentControl } from "./controls/AlignmentControl";
@@ -21,6 +24,47 @@ import { RadiusControl } from "./controls/RadiusControl";
 import { SegmentedControl } from "./controls/SegmentedControl";
 import { SelectControl } from "./controls/SelectControl";
 import { WeightSelect } from "./controls/WeightSelect";
+import { TypoLetterSpacingIcon, TypoLineHeightIcon, SectionCollapseIcon, SectionExpandIcon, SectionDivider } from "./controls/typographyIcons";
+
+function ElementPropsIcon() {
+  return (
+    <svg
+      className="wv-edit-tray-props-icon"
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <g clipPath="url(#wv_edit_props_clip)">
+        <path
+          d="M4.08333 4.6665L1.75 6.99984L4.08333 9.33317"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M9.91675 4.6665L12.2501 6.99984L9.91675 9.33317"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M8.16659 2.3335L5.83325 11.6668"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+      <defs>
+        <clipPath id="wv_edit_props_clip">
+          <rect width="14" height="14" fill="white" />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+}
 
 type EditTrayProps = {
   element: Element;
@@ -61,10 +105,12 @@ function parseGridColumnCount(gridTemplateColumns: string): number {
 
 // CSS properties to show in the raw CSS toggle panel, per category
 const CSS_PANEL_PROPS: Record<ElementCategory, string[]> = {
-  text:    ["color", "font-size", "font-weight", "font-family", "line-height", "letter-spacing", "text-align"],
+  text:    ["color", "background-color", "font-size", "font-weight", "font-family", "line-height", "letter-spacing", "text-align"],
   svg:     ["width", "height", "fill", "stroke"],
   image:   ["object-fit", "width", "height"],
   stack:   [
+    "color",
+    "background-color",
     "display",
     "flex-direction",
     "grid-template-columns",
@@ -76,7 +122,7 @@ const CSS_PANEL_PROPS: Record<ElementCategory, string[]> = {
     "width",
     "height",
   ],
-  generic: ["display", "width", "height"],
+  generic: ["color", "background-color", "display", "width", "height"],
 };
 
 export function EditTray({
@@ -88,6 +134,7 @@ export function EditTray({
 }: EditTrayProps) {
   const [category, setCategory] = useState<ElementCategory>("generic");
   const [cssOpen, setCssOpen] = useState(false);
+  const [boxSectionOpen, setBoxSectionOpen] = useState(true);
   const [, setTick] = useState(0);
   const fromValuesRef = useRef<Map<string, string>>(new Map());
 
@@ -95,6 +142,7 @@ export function EditTray({
   useEffect(() => {
     setCategory(classifyElement(element));
     setCssOpen(false);
+    setBoxSectionOpen(true);
 
     // Pre-record ALL property baselines using getComputedStyle (not inline style)
     // so fromValue is always available even if onFocus doesn't fire before handleChange.
@@ -103,7 +151,7 @@ export function EditTray({
     const cs = getComputedStyle(element);
     const baseline = new Map<string, string>();
     const BASELINE_PROPS = [
-      "color", "font-size", "font-weight", "text-align",
+      "color", "background-color", "font-size", "font-weight", "text-align",
       "line-height", "letter-spacing",
       "width", "height", "object-fit", "display",
       "flex-direction",
@@ -333,7 +381,10 @@ export function EditTray({
   const textAlign     = (["left", "center", "right"].includes(rawAlign) ? rawAlign : "left") as "left" | "center" | "right";
   const lineHeight = readLineHeightAsPixelNumber(element);
   const letterSpacing = parseFloat(readPropertyValue(element, "letter-spacing")) || 0;
-  const fontColor     = rgbToHex(readPropertyValue(element, "color") || "#000000");
+  const fontColor = readCssColorForPicker(element, "color");
+  const backgroundColor = readCssColorForPicker(element, "background-color");
+
+  const showBackgroundColour = supportsCssBackgroundColor(category);
 
   const svgWidth  = parseFloat(readPropertyValue(element, "width"))  || 24;
   const svgHeight = parseFloat(readPropertyValue(element, "height")) || 24;
@@ -373,105 +424,103 @@ export function EditTray({
     .map((prop) => ({ prop, value: cs.getPropertyValue(prop).trim() }))
     .filter((l) => l.value && l.value !== "normal" && l.value.length > 0);
 
-  // ─── Derive a display title from fiber if available ───────────────────
-  const componentName: string | null = (() => {
-    try {
-      const fiberKey = Object.keys(element).find((k) => k.startsWith("__reactFiber$"));
-      if (!fiberKey) return null;
-      let cur = (element as unknown as Record<string, unknown>)[fiberKey] as {
-        type?: unknown;
-        return?: unknown;
-      } | null;
-      while (cur) {
-        if (
-          typeof cur.type === "function" &&
-          (cur.type as { name?: string }).name &&
-          /^[A-Z]/.test((cur.type as { name: string }).name)
-        ) {
-          return (cur.type as { name: string }).name;
-        }
-        cur = (cur.return as typeof cur) ?? null;
-      }
-    } catch {
-      /* ignore fiber errors */
-    }
-    return null;
-  })();
-
-  const categoryLabel =
-    category === "text"  ? "Text"    :
-    category === "svg"   ? "SVG"     :
-    category === "image" ? "Image"   :
-    category === "stack" ? "Stack"   : "Element";
-
-  const trayTitle = componentName ? `<${componentName}>` : categoryLabel;
+  // ─── Element type label for tray header ───────────────────────────────
+  const trayTitle = elementTypeLabel(element, category);
 
   // ─── Shared Box section (rendered for every element category) ─────────
   const BoxSection = (
-    <>
-      <div className="wv-edit-section-label">Box</div>
-      <BoxControl
-        property="margin"
-        values={marginValues}
-        onChange={(axis, v) => handleBoxChange("margin", axis, v)}
-        onCommit={(axis, v) => handleBoxCommit("margin", axis, v)}
-        onFocus={(axis) => snapshotBoxAxis("margin", axis)}
-        onDeferCancel={(axis) => revertBoxAxisPreview("margin", axis)}
-      />
-      <BoxControl
-        property="padding"
-        values={paddingValues}
-        onChange={(axis, v) => handleBoxChange("padding", axis, v)}
-        onCommit={(axis, v) => handleBoxCommit("padding", axis, v)}
-        onFocus={(axis) => snapshotBoxAxis("padding", axis)}
-        onDeferCancel={(axis) => revertBoxAxisPreview("padding", axis)}
-      />
-      <div className="wv-edit-section-label">Border</div>
-      <BorderControl
-        width={borderVals.width}
-        style={borderVals.style}
-        color={borderVals.color}
-        styleCommitTarget={element}
-        selectionDismissSignal={element}
-        onWidthChange={(v) => handleChange("border-width", v)}
-        onWidthCommit={(v) => handleCommit("border-width", "Border Width", v)}
-        onStyleChange={(v) => handleChange("border-style", v)}
-        onStyleCommit={(v) => handleCommit("border-style", "Border Style", v)}
-        onColorChange={(v, target) => handleChange("border-color", v, target)}
-        onColorCommit={(v, target, fromSnap) =>
-          handleCommit("border-color", "Border Color", v, target, fromSnap)}
-        onFocusWidth={() => handleDeferrableFocus("border-width")}
-        onCancelWidth={() => revertDeferrablePreview("border-width")}
-        onFocusColor={() => handleFocus("border-color")}
-      />
-      <RadiusControl
-        values={radiusVals}
-        onSingleChange={(v) => handleChange("border-radius", v)}
-        onSingleCommit={(v) => handleCommit("border-radius", "Radius", v)}
-        onCornerChange={(corner, v) => {
-          const map: Record<string, string> = {
-            tl: "top-left", tr: "top-right",
-            br: "bottom-right", bl: "bottom-left",
-          };
-          handleChange(`border-${map[corner]}-radius`, v);
-        }}
-        onCornerCommit={(corner, v) => {
-          const map: Record<string, string> = {
-            tl: "top-left", tr: "top-right",
-            br: "bottom-right", bl: "bottom-left",
-          };
-          handleCommit(`border-${map[corner]}-radius`, `Radius ${corner.toUpperCase()}`, v);
-        }}
-        onFocus={(corner) => handleDeferrableFocus(radiusCornerCss(corner))}
-        onDeferCancel={(corner) => revertDeferrablePreview(radiusCornerCss(corner))}
-      />
-      <OpacityControl
-        value={opacity}
-        onChange={(v) => handleChange("opacity", String(v))}
-        onCommit={(v) => handleCommit("opacity", "Opacity", String(v))}
-        onFocus={() => handleDeferrableFocus("opacity")}
-      />
-    </>
+    <div className="wv-style-section wv-box-section">
+      <div className="wv-style-section-head">
+        <span className="wv-style-section-title">Box</span>
+        <button
+          type="button"
+          className="wv-style-section-toggle wv-pe"
+          aria-expanded={boxSectionOpen}
+          aria-label={boxSectionOpen ? "Collapse box section" : "Expand box section"}
+          onClick={() => setBoxSectionOpen((open) => !open)}
+        >
+          {boxSectionOpen ? <SectionCollapseIcon /> : <SectionExpandIcon />}
+        </button>
+      </div>
+      {boxSectionOpen && (
+        <div className="wv-box-section-body">
+          <BoxControl
+            property="margin"
+            values={marginValues}
+            onChange={(axis, v) => handleBoxChange("margin", axis, v)}
+            onCommit={(axis, v) => handleBoxCommit("margin", axis, v)}
+            onFocus={(axis) => snapshotBoxAxis("margin", axis)}
+            onDeferCancel={(axis) => revertBoxAxisPreview("margin", axis)}
+          />
+          <BoxControl
+            property="padding"
+            values={paddingValues}
+            onChange={(axis, v) => handleBoxChange("padding", axis, v)}
+            onCommit={(axis, v) => handleBoxCommit("padding", axis, v)}
+            onFocus={(axis) => snapshotBoxAxis("padding", axis)}
+            onDeferCancel={(axis) => revertBoxAxisPreview("padding", axis)}
+          />
+          {showBackgroundColour && (
+            <ColorPicker
+              variant="card"
+              cardLabel="Colour"
+              value={backgroundColor}
+              styleCommitTarget={element}
+              selectionDismissSignal={element}
+              onChange={(v, target) => handleChange("background-color", v, target)}
+              onCommit={(v, target, fromSnap) =>
+                handleCommit("background-color", "Background Colour", v, target, fromSnap)}
+              onFocus={() => handleFocus("background-color")}
+            />
+          )}
+          <div className="wv-edit-section-label">Border</div>
+          <BorderControl
+            width={borderVals.width}
+            style={borderVals.style}
+            color={borderVals.color}
+            styleCommitTarget={element}
+            selectionDismissSignal={element}
+            onWidthChange={(v) => handleChange("border-width", v)}
+            onWidthCommit={(v) => handleCommit("border-width", "Border Width", v)}
+            onStyleChange={(v) => handleChange("border-style", v)}
+            onStyleCommit={(v) => handleCommit("border-style", "Border Style", v)}
+            onColorChange={(v, target) => handleChange("border-color", v, target)}
+            onColorCommit={(v, target, fromSnap) =>
+              handleCommit("border-color", "Border Color", v, target, fromSnap)}
+            onFocusWidth={() => handleDeferrableFocus("border-width")}
+            onCancelWidth={() => revertDeferrablePreview("border-width")}
+            onFocusColor={() => handleFocus("border-color")}
+          />
+          <RadiusControl
+            values={radiusVals}
+            onSingleChange={(v) => handleChange("border-radius", v)}
+            onSingleCommit={(v) => handleCommit("border-radius", "Radius", v)}
+            onCornerChange={(corner, v) => {
+              const map: Record<string, string> = {
+                tl: "top-left", tr: "top-right",
+                br: "bottom-right", bl: "bottom-left",
+              };
+              handleChange(`border-${map[corner]}-radius`, v);
+            }}
+            onCornerCommit={(corner, v) => {
+              const map: Record<string, string> = {
+                tl: "top-left", tr: "top-right",
+                br: "bottom-right", bl: "bottom-left",
+              };
+              handleCommit(`border-${map[corner]}-radius`, `Radius ${corner.toUpperCase()}`, v);
+            }}
+            onFocus={(corner) => handleDeferrableFocus(radiusCornerCss(corner))}
+            onDeferCancel={(corner) => revertDeferrablePreview(radiusCornerCss(corner))}
+          />
+          <OpacityControl
+            value={opacity}
+            onChange={(v) => handleChange("opacity", String(v))}
+            onCommit={(v) => handleCommit("opacity", "Opacity", String(v))}
+            onFocus={() => handleDeferrableFocus("opacity")}
+          />
+        </div>
+      )}
+    </div>
   );
 
   return (
@@ -479,32 +528,33 @@ export function EditTray({
       className={`wv-edit-tray wv-pe${hidden ? " wv-edit-tray--hidden" : ""}`}
       aria-hidden={hidden}
     >
-      {/* Header row: element title + CSS toggle button */}
+      {/* Header row: element type + properties toggle */}
       <div className="wv-edit-tray-head">
         <span className="wv-edit-tray-title">{trayTitle}</span>
         <button
           type="button"
-          className={`wv-edit-tray-code-btn wv-pe${cssOpen ? " wv-edit-tray-code-btn--active" : ""}`}
-          title="Toggle raw CSS view"
+          className={`wv-edit-tray-props-btn wv-pe${cssOpen ? " wv-edit-tray-props-btn--active" : ""}`}
+          title="Toggle element properties"
+          aria-label="Toggle element properties"
+          aria-expanded={cssOpen}
           onClick={() => setCssOpen((s) => !s)}
         >
-          {"</>"}
+          <ElementPropsIcon />
         </button>
       </div>
 
-      {/* Raw CSS panel — visible when cssOpen is true */}
+      {/* Computed properties — visible when toggled open */}
       {cssOpen && (
-        <div className="wv-css-panel">
-          {cssPanelLines.map((l) => (
-            <div key={l.prop} className="wv-css-panel-line">
-              <span className="wv-css-panel-prop">{l.prop}</span>
-              <span className="wv-css-panel-sep">: </span>
-              <span className="wv-css-panel-val">{l.value}</span>
-              <span className="wv-css-panel-sep">;</span>
-            </div>
-          ))}
-          {cssPanelLines.length === 0 && (
-            <span className="wv-css-panel-empty">No relevant styles found.</span>
+        <div className="wv-edit-props-card">
+          {cssPanelLines.length > 0 ? (
+            cssPanelLines.map((l) => (
+              <p key={l.prop} className="wv-edit-props-line">
+                <span className="wv-edit-props-key">{l.prop}:</span>
+                <span className="wv-edit-props-val"> {l.value};</span>
+              </p>
+            ))
+          ) : (
+            <p className="wv-edit-props-empty">No relevant styles found.</p>
           )}
         </div>
       )}
@@ -515,78 +565,81 @@ export function EditTray({
         {/* ── Text ── */}
         {category === "text" && (
           <>
-            <div className="wv-edit-section-label">Typography</div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Font Size</span>
-              <NumberInput
-                cssProperty="font-size"
-                displayLabel="Font Size"
-                value={fontSize}
-                unit="px"
-                min={1}
-                max={999}
-                onChange={(v) => handleChange("font-size", v)}
-                onCommit={(v) => handleCommit("font-size", "Font Size", v)}
-                onFocus={() => handleDeferrableFocus("font-size")}
-                onCancel={() => revertDeferrablePreview("font-size")}
-              />
-            </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Font Weight</span>
-              <WeightSelect
-                value={fontWeight}
-                onChange={(v) => handleChange("font-weight", String(v))}
-                onCommit={(v) => handleCommit("font-weight", "Font Weight", String(v))}
-                onFocus={() => handleFocus("font-weight")}
-                onCancel={() => revertDeferrablePreview("font-weight")}
-              />
-            </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Alignment</span>
+            <div className="wv-typo-stack">
+              <div className="wv-typo-card">
+                <span className="wv-typo-card-label">Font Size</span>
+                <NumberInput
+                  cssProperty="font-size"
+                  displayLabel="Font Size"
+                  value={fontSize}
+                  unit="px"
+                  min={1}
+                  max={999}
+                  variant="card"
+                  onChange={(v) => handleChange("font-size", v)}
+                  onCommit={(v) => handleCommit("font-size", "Font Size", v)}
+                  onFocus={() => handleDeferrableFocus("font-size")}
+                  onCancel={() => revertDeferrablePreview("font-size")}
+                />
+              </div>
+              <div className="wv-typo-card">
+                <span className="wv-typo-card-label">Font Weight</span>
+                <WeightSelect
+                  variant="card"
+                  value={fontWeight}
+                  onChange={(v) => handleChange("font-weight", String(v))}
+                  onCommit={(v) => handleCommit("font-weight", "Font Weight", String(v))}
+                  onFocus={() => handleFocus("font-weight")}
+                  onCancel={() => revertDeferrablePreview("font-weight")}
+                />
+              </div>
               <SegmentedControl
+                variant="card"
                 value={textAlign}
                 onCommit={(v) => {
                   handleFocus("text-align");
                   handleCommit("text-align", "Font Alignment", v);
                 }}
               />
-            </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Line Height</span>
-              <NumberInput
-                cssProperty="line-height"
-                displayLabel="Line Height"
-                value={lineHeight}
-                unit="px"
-                min={0}
-                max={500}
-                step={0.5}
-                onChange={(v) => handleChange("line-height", v)}
-                onCommit={(v) => handleCommit("line-height", "Line Height", v)}
-                onFocus={() => handleDeferrableFocus("line-height")}
-                onCancel={() => revertDeferrablePreview("line-height")}
-              />
-            </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Letter Spacing</span>
-              <NumberInput
-                cssProperty="letter-spacing"
-                displayLabel="Letter Spacing"
-                value={letterSpacing}
-                unit="px"
-                min={-20}
-                max={50}
-                step={0.5}
-                onChange={(v) => handleChange("letter-spacing", v)}
-                onCommit={(v) => handleCommit("letter-spacing", "Letter Spacing", v)}
-                onFocus={() => handleDeferrableFocus("letter-spacing")}
-                onCancel={() => revertDeferrablePreview("letter-spacing")}
-              />
-            </div>
-            <div className="wv-edit-section-label">Style</div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Font Colour</span>
+              <div className="wv-typo-dual-row">
+                <div className="wv-typo-icon-card">
+                  <TypoLineHeightIcon />
+                  <NumberInput
+                    cssProperty="line-height"
+                    displayLabel="Line Height"
+                    value={lineHeight}
+                    unit="px"
+                    min={0}
+                    max={500}
+                    step={0.5}
+                    variant="card"
+                    onChange={(v) => handleChange("line-height", v)}
+                    onCommit={(v) => handleCommit("line-height", "Line Height", v)}
+                    onFocus={() => handleDeferrableFocus("line-height")}
+                    onCancel={() => revertDeferrablePreview("line-height")}
+                  />
+                </div>
+                <div className="wv-typo-icon-card">
+                  <TypoLetterSpacingIcon />
+                  <NumberInput
+                    cssProperty="letter-spacing"
+                    displayLabel="Letter Spacing"
+                    value={letterSpacing}
+                    unit="px"
+                    min={-20}
+                    max={50}
+                    step={0.5}
+                    variant="card"
+                    onChange={(v) => handleChange("letter-spacing", v)}
+                    onCommit={(v) => handleCommit("letter-spacing", "Letter Spacing", v)}
+                    onFocus={() => handleDeferrableFocus("letter-spacing")}
+                    onCancel={() => revertDeferrablePreview("letter-spacing")}
+                  />
+                </div>
+              </div>
               <ColorPicker
+                variant="card"
+                cardLabel="Font"
                 value={fontColor}
                 styleCommitTarget={element}
                 selectionDismissSignal={element}
@@ -596,6 +649,7 @@ export function EditTray({
                 onFocus={() => handleFocus("color")}
               />
             </div>
+            <SectionDivider />
           </>
         )}
 
@@ -631,6 +685,7 @@ export function EditTray({
                 onCancel={() => revertDeferrablePreview("height")}
               />
             </div>
+            <SectionDivider />
           </>
         )}
 
@@ -683,6 +738,7 @@ export function EditTray({
                 onCancel={() => revertDeferrablePreview("height")}
               />
             </div>
+            <SectionDivider />
           </>
         )}
 
@@ -718,6 +774,7 @@ export function EditTray({
                 onCancel={() => revertDeferrablePreview("height")}
               />
             </div>
+            <SectionDivider />
             <div className="wv-edit-section-label">Layout</div>
             <div className="wv-prop-row">
               <span className="wv-prop-label">Layout</span>
@@ -879,6 +936,7 @@ export function EditTray({
                 />
               </div>
             )}
+            <SectionDivider />
             <div className="wv-edit-section-label">Alignment</div>
             <AlignmentControl
               justifyContent={justifyContent}
@@ -892,6 +950,7 @@ export function EditTray({
                 handleCommit("align-items", "Cross Axis Alignment", v);
               }}
             />
+            <SectionDivider />
           </>
         )}
 

@@ -1101,7 +1101,7 @@ export const OVERLAY_CSS = `
   overflow-x: hidden;
   overflow-y: visible;
   min-height: 0;
-  padding: 14px 16px;
+  padding: 14px;
   box-sizing: border-box;
 }
 .wv-tray-content-selection .wv-tray-card {
@@ -1550,26 +1550,33 @@ export const OVERLAY_CSS = `
   min-width: 0;
 }
 .wv-edit-tray-title {
-  font-size: 12px;
-  color: #ebebeb;
+  flex: 1 1 auto;
   min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 100%;
+  color: var(--weevar-grey100, #868689);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.wv-edit-tray-code-btn {
+.wv-edit-tray-props-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  border: 1px solid var(--wv-border);
-  background: rgba(235, 235, 235, 0.06);
+  padding: 4px;
+  border: none;
+  border-radius: 100px;
+  background: rgba(235, 235, 235, 0.05);
   color: #868689;
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 11px;
   cursor: pointer;
+  line-height: 0;
 }
-.wv-edit-tray-code-btn--active {
-  color: var(--wv-accent);
-  border-color: rgba(123, 229, 163, 0.35);
+.wv-edit-tray-props-btn--active {
+  color: #ebebeb;
+  background: rgba(235, 235, 235, 0.1);
 }
 .wv-edit-section-label {
   font-size: 10px;
@@ -1641,7 +1648,7 @@ export const OVERLAY_CSS = `
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 14px;
+  padding: 4px 0;
   pointer-events: auto;
 }
 .wv-opacity-track {
@@ -1699,7 +1706,7 @@ export const OVERLAY_CSS = `
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
-  padding: 4px 14px 8px;
+  padding: 4px 0 8px;
   pointer-events: auto;
 }
 .wv-alignment-cell {
@@ -1740,64 +1747,93 @@ export const OVERLAY_CSS = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px 8px;
-  border-bottom: 1px solid var(--wv-border);
+  gap: 8px;
+  padding: 0 0 8px;
+  min-width: 0;
 }
 
 .wv-edit-tray-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-size: 12px;
-  font-weight: 500;
-  color: #e8eaed;
-  white-space: nowrap;
+  font-weight: 400;
+  line-height: 100%;
+  color: var(--weevar-grey100, #868689);
+  word-break: break-word;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.wv-edit-tray-code-btn {
-  font-family: monospace;
-  font-size: 11px;
-  color: #888;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 2px 6px;
+.wv-edit-tray-props-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  border: none;
+  border-radius: 100px;
+  background: rgba(235, 235, 235, 0.05);
+  color: #868689;
   cursor: pointer;
   pointer-events: auto;
-  transition: color 0.15s, border-color 0.15s;
-  flex-shrink: 0;
+  line-height: 0;
+  transition: background 0.15s, color 0.15s;
 }
-.wv-edit-tray-code-btn:hover {
-  color: #e8eaed;
-  border-color: var(--wv-border);
+.wv-edit-tray-props-btn:hover {
+  color: #ebebeb;
+  background: rgba(235, 235, 235, 0.08);
 }
-.wv-edit-tray-code-btn--active {
-  color: var(--wv-accent);
-  border-color: var(--wv-accent);
+.wv-edit-tray-props-btn--active {
+  color: #ebebeb;
+  background: rgba(235, 235, 235, 0.1);
 }
-
-/* ─── Raw CSS panel ──────────────────────────────────────────────────── */
-
-.wv-css-panel {
-  background: #0a0c10;
-  border-bottom: 1px solid var(--wv-border);
-  padding: 8px 14px;
-  max-height: 140px;
-  overflow-y: auto;
+.wv-edit-tray-props-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
 }
 
-.wv-css-panel-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1px;
-  line-height: 1.6;
-  font-family: "Geist Mono", monospace;
-  font-size: 11px;
+/* ─── Expanded element properties card ───────────────────────────────── */
+
+.wv-edit-props-card {
+  margin-bottom: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(235, 235, 235, 0.05);
+  overflow: hidden;
 }
 
-.wv-css-panel-prop  { color: #79c0ff; }
-.wv-css-panel-sep   { color: #888; }
-.wv-css-panel-val   { color: #a5d6ff; word-break: break-all; }
-.wv-css-panel-empty { color: #555; font-size: 11px; }
+.wv-edit-props-line {
+  margin: 0;
+  word-break: break-word;
+}
+
+.wv-edit-props-key {
+  color: #aaa0fa;
+}
+
+.wv-edit-props-val {
+  color: var(--weevar-light, #ebebeb);
+}
+
+.wv-edit-props-empty {
+  margin: 0;
+  color: #868689;
+}
+
+.wv-edit-props-card,
+.wv-edit-props-line,
+.wv-edit-props-key,
+.wv-edit-props-val,
+.wv-edit-props-empty {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 11px !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  line-height: 170% !important;
+}
 
 /* ─── Controls container ─────────────────────────────────────────────── */
 
@@ -1814,7 +1850,7 @@ export const OVERLAY_CSS = `
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--wv-success);
-  padding: 10px 14px 4px;
+  padding: 10px 0 4px;
   margin-top: 4px;
 }
 
@@ -1822,7 +1858,7 @@ export const OVERLAY_CSS = `
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 14px;
+  padding: 3px 0;
   min-height: 28px;
 }
 
@@ -2019,6 +2055,223 @@ export const OVERLAY_CSS = `
 .wv-weight-option:hover { background: var(--wv-border); }
 .wv-weight-option--active { color: var(--wv-accent); }
 
+/* ─── Typography fields (Figma card rows) ───────────────────────────── */
+
+.wv-typo-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-typo-card,
+.wv-typo-icon-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 34px;
+  min-width: 0;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.wv-typo-card {
+  padding: 8px 10px;
+}
+
+.wv-typo-icon-card {
+  flex: 1 1 0;
+  padding: 8px 10px 8px 8px;
+  color: #c7c7c7;
+}
+
+.wv-typo-field-icon {
+  display: block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  max-width: 16px;
+  max-height: 16px;
+}
+
+.wv-typo-card-label {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-typo-dual-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-typo-chevron {
+  display: block;
+  flex-shrink: 0;
+  color: #58585d;
+}
+
+.wv-number-input--card,
+.wv-number-input-wrap.wv-number-input--card {
+  border: none;
+  background: transparent;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: none;
+  box-shadow: none;
+}
+
+.wv-number-input--card {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 24px;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  line-height: 100% !important;
+  color: #c7c7c7 !important;
+  text-align: right;
+}
+
+.wv-number-input-wrap.wv-number-input--card:focus-within {
+  border: none;
+  outline: none;
+}
+
+.wv-number-input-wrap.wv-number-input--card .wv-number-input:focus {
+  outline: none;
+}
+
+.wv-number-input-wrap.wv-number-input--card .wv-number-input-unit {
+  display: none;
+}
+
+.wv-weight-wrap--card {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wv-weight-wrap--card .wv-weight-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: auto;
+  min-width: 0;
+}
+
+.wv-weight-wrap--card .wv-weight-custom-input--card {
+  flex: 0 1 auto;
+  min-width: 24px;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #c7c7c7;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 100%;
+  text-align: right;
+  outline: none;
+  cursor: text;
+}
+
+.wv-weight-card-chevron {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.wv-weight-native--card-menu {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+.wv-segmented--typo {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.wv-segmented--typo .wv-segmented-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  height: 100%;
+  margin: 0;
+  padding: 8px;
+  border: none;
+  border-radius: 0;
+  background: rgba(235, 235, 235, 0.05);
+  color: #c7c7c7;
+  box-sizing: border-box;
+}
+
+.wv-segmented--typo .wv-segmented-btn:first-child {
+  border-radius: 12px 0 0 12px;
+}
+
+.wv-segmented--typo .wv-segmented-btn:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.wv-segmented--typo .wv-segmented-btn:hover {
+  color: #ebebeb;
+}
+
+.wv-segmented--typo .wv-segmented-btn[data-active="true"] {
+  background: #58585d;
+  color: #ebebeb;
+}
+
 /* ─── ColorPicker ────────────────────────────────────────────────────── */
 
 .wv-color-row {
@@ -2037,13 +2290,25 @@ export const OVERLAY_CSS = `
 }
 
 .wv-color-swatch {
+  display: block;
   width: 20px;
   height: 20px;
-  border-radius: 4px;
-  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 2px;
+  border: none;
+  box-shadow: inset 0 0 0 1px #262628;
   cursor: pointer;
   flex-shrink: 0;
   pointer-events: auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.wv-color-swatch--card {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(235, 235, 235, 0.05);
 }
 
 .wv-color-native {
@@ -2071,9 +2336,235 @@ export const OVERLAY_CSS = `
 }
 .wv-color-hex:focus { border-color: var(--wv-accent); }
 
+.wv-color-alpha-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  pointer-events: auto;
+  margin-left: 10px;
+}
+
+.wv-color-alpha {
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  color: #e8eaed;
+  font-size: 11px;
+  font-family: monospace;
+  height: 22px;
+  padding: 0 5px;
+  width: 40px;
+  outline: none;
+  pointer-events: auto;
+  text-align: right;
+}
+.wv-color-alpha:focus { border-color: var(--wv-accent); }
+
+.wv-color-alpha-unit {
+  color: #888;
+  font-size: 11px;
+  font-family: monospace;
+  pointer-events: none;
+}
+
+/* Figma card layout (471:2183) — two rows + divider */
+.wv-color-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.wv-color-card--disabled {
+  opacity: 0.42;
+}
+
+.wv-color-card--disabled .wv-color-swatch {
+  cursor: default;
+}
+
+.wv-color-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-color-card-label {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-color-card-value {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wv-color-card-hex,
+.wv-color-card-alpha {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  line-height: 100% !important;
+  color: #c7c7c7 !important;
+  text-align: right;
+  outline: none;
+  pointer-events: auto;
+}
+
+.wv-color-card-hex:focus,
+.wv-color-card-alpha:focus {
+  outline: none;
+}
+
+.wv-color-card-alpha-unit {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  pointer-events: none;
+}
+
+.wv-color-card-divider {
+  display: block;
+  width: auto;
+  height: 0;
+  min-height: 0;
+  margin: 0 -10px;
+  padding: 0;
+  border: none;
+  border-top: 1px solid rgba(235, 235, 235, 0.05);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.wv-box-control + .wv-color-card {
+  margin-top: 8px;
+}
+
+/* ─── Style section (Figma) ──────────────────────────────────────────── */
+
+.wv-style-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-section-divider {
+  display: block;
+  width: 100%;
+  height: 0;
+  min-height: 0;
+  margin: 16px 0;
+  padding: 0;
+  border: none;
+  border-top: 1px solid rgba(235, 235, 235, 0.05);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.wv-style-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-style-section-title {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #868689;
+  white-space: nowrap;
+}
+
+.wv-style-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: #484848;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+}
+
+.wv-style-section-toggle:hover {
+  color: #c7c7c7;
+}
+
+/* Box section — Figma 324:7710 (16px below divider, 16px to content) */
+.wv-box-section {
+  margin-top: 0;
+}
+
+.wv-section-divider + .wv-box-section {
+  margin-top: 0;
+}
+
+.wv-box-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-section-body > .wv-edit-section-label {
+  margin-top: 0;
+  padding-top: 0;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #868689;
+}
+
 /* ─── BoxControl ─────────────────────────────────────────────────────── */
 
-.wv-box-control { padding: 4px 14px; }
+.wv-box-control { padding: 4px 0; }
 
 .wv-box-header {
   display: flex;
@@ -2130,11 +2621,32 @@ export const OVERLAY_CSS = `
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 14px;
+  padding: 3px 0;
   flex-wrap: nowrap;
 }
 
 /* ─── RadiusControl ──────────────────────────────────────────────────── */
 
-.wv-radius-control { padding: 4px 14px; }
+.wv-radius-control { padding: 4px 0; }
+
+/* Selection tray: 14px horizontal inset is only on .wv-tray-content-selection */
+.wv-tray-content-selection .wv-edit-tray-head,
+.wv-tray-content-selection .wv-typo-stack,
+.wv-tray-content-selection .wv-section-divider,
+.wv-tray-content-selection .wv-style-section,
+.wv-tray-content-selection .wv-box-section,
+.wv-tray-content-selection .wv-edit-section-label,
+.wv-tray-content-selection .wv-prop-row,
+.wv-tray-content-selection .wv-opacity-row,
+.wv-tray-content-selection .wv-alignment-grid,
+.wv-tray-content-selection .wv-box-control,
+.wv-tray-content-selection .wv-border-row,
+.wv-tray-content-selection .wv-radius-control {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.wv-tray-content-selection .wv-edit-props-card {
+  padding: 10px !important;
+}
 `;

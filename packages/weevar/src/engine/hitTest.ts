@@ -1,6 +1,53 @@
 export const WEEVAR_HOST_ID = "__weevar_host__";
 export const WEEVAR_BOOT_DOT_CLASS = "__weevar_boot_dot__";
 
+export function pointInDOMRect(x: number, y: number, rect: DOMRect): boolean {
+  return x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom;
+}
+
+export function domRectsOverlap(a: DOMRect, b: DOMRect): boolean {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+export function estimateCursorLabelWidth(text: string): number {
+  return Math.min(210, Math.max(56, text.length * 7 + 20));
+}
+
+export type ViewportSize = { width: number; height: number };
+
+/** Place a cursor-following hover label without overlapping blocked regions (e.g. open tray). */
+export function placeCursorHoverLabel(
+  x: number,
+  y: number,
+  text: string,
+  avoid: DOMRect[],
+  viewport: ViewportSize = { width: window.innerWidth, height: window.innerHeight },
+): { left: number; top: number } | null {
+  const height = 24;
+  const width = estimateCursorLabelWidth(text);
+  const margin = 6;
+  const pad = 12;
+
+  const candidates = [
+    { left: x + pad, top: y - height - 2 },
+    { left: x + pad, top: y + 16 },
+    { left: x - width - pad, top: y - height - 2 },
+    { left: x - width - pad, top: y + 16 },
+    { left: x - width / 2, top: y - height - pad - 8 },
+    { left: x - width / 2, top: y + pad + 8 },
+  ];
+
+  for (const c of candidates) {
+    const left = Math.min(Math.max(margin, c.left), viewport.width - width - margin);
+    const top = Math.min(Math.max(margin, c.top), viewport.height - height - margin);
+    const rect = new DOMRect(left, top, width, height);
+    if (!avoid.some((zone) => domRectsOverlap(rect, zone))) {
+      return { left, top };
+    }
+  }
+  return null;
+}
+
 export function isInsideWeevarOverlay(el: Node | null): boolean {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
   const element = el as Element;

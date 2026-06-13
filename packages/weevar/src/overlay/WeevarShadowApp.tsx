@@ -14,6 +14,8 @@ import {
   blurWeevarOverlayFocusIfPointerOutside,
   hitTestHostPage,
   isInsideWeevarOverlay,
+  placeCursorHoverLabel,
+  pointInDOMRect,
 } from "../engine/hitTest";
 import { buildAncestorPath } from "../engine/layoutContext";
 import { buildReorderLayoutChange } from "../engine/layoutChangeFromReorder";
@@ -356,6 +358,7 @@ export function WeevarShadowApp({
   const [dockPos, setDockPos] = useState<DockPos>(() => getDefaultDockPos());
   const [triggerAtTop, setTriggerAtTop] = useState(true);
   const dockRef = useRef<HTMLDivElement | null>(null);
+  const trayStackRef = useRef<HTMLDivElement | null>(null);
   const triggerBtnRef = useRef<HTMLButtonElement | null>(null);
   const dockDragRef = useRef<
     | null
@@ -1088,7 +1091,8 @@ export function WeevarShadowApp({
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      const overChrome = pointerOverWeevarChrome(e);
+      const trayBounds = trayStackRef.current?.getBoundingClientRect() ?? null;
+      const overChrome = pointerOverWeevarChrome(e, trayBounds);
       if (!overChrome) {
         forceCursorOnTarget(document.elementFromPoint(e.clientX, e.clientY));
       } else {
@@ -1116,7 +1120,8 @@ export function WeevarShadowApp({
       if (dragSessionRef.current) return;
       if (promptOpen) return;
       blurWeevarOverlayFocusIfPointerOutside(e);
-      if (pointerOverWeevarChrome(e)) return;
+      const trayBounds = trayStackRef.current?.getBoundingClientRect() ?? null;
+      if (pointerOverWeevarChrome(e, trayBounds)) return;
       const el = hitTestHostPage(e.clientX, e.clientY);
       if (!el) {
         selectedRef.current = null;
@@ -1428,6 +1433,19 @@ body *:focus {
   /** Taller tray shell only when the pointer selection EditTray is the visible summary tray. */
   const editSelectionTrayVisible =
     showSummaryTray && activeTool === "pointer" && pointerSelectionInfo != null;
+  const pointerOverOpenTray =
+    trayAnyOpen &&
+    pointerPos != null &&
+    trayStackRef.current != null &&
+    pointInDOMRect(
+      pointerPos.x,
+      pointerPos.y,
+      trayStackRef.current.getBoundingClientRect(),
+    );
+  const labelAvoidRects =
+    trayAnyOpen && trayStackRef.current
+      ? [trayStackRef.current.getBoundingClientRect()]
+      : [];
   const trayStyle = useMemo((): CSSProperties => {
     const trayWidth = 250;
     const gap = 8;
@@ -1608,6 +1626,10 @@ body *:focus {
 
   return (
     <>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400&display=swap"
+      />
       <style>{OVERLAY_CSS}</style>
       <div className="wv-root" aria-hidden={!sessionOn}>
         {!sessionOn ? (
@@ -1803,6 +1825,7 @@ body *:focus {
 
             {trayAnyOpen ? (
               <div
+                ref={trayStackRef}
                 className={`wv-tray-stack${editSelectionTrayVisible ? " wv-tray-stack--edit" : ""}`}
                 style={trayStyle}
               >
@@ -2003,7 +2026,8 @@ body *:focus {
               hoverEl &&
               (!selectedEl || hoverEl !== selectedEl) &&
               !isDragging &&
-              !promptOpen && <Outline rect={frames.hover} variant="hover" />}
+              !promptOpen &&
+              !pointerOverOpenTray && <Outline rect={frames.hover} variant="hover" />}
 
             {activeTool === "pointer" && frames.selected && selectedEl && !promptOpen && (
               <>
@@ -2030,6 +2054,7 @@ body *:focus {
                   x={pointerPos.x}
                   y={pointerPos.y}
                   text={buildSpecificElementLabel(hoverEl)}
+                  avoidRects={labelAvoidRects}
                 />
               )}
           </>
@@ -2186,7 +2211,11 @@ function eventFromWeevarChrome(e: PointerEvent | KeyboardEvent): boolean {
 }
 
 /** True when coordinates hit Weevar UI (dock, trays, etc.), not the host page. */
-function pointerOverWeevarChrome(e: PointerEvent): boolean {
+function pointerOverWeevarChrome(
+  e: PointerEvent,
+  trayBounds: DOMRect | null = null,
+): boolean {
+  if (trayBounds && pointInDOMRect(e.clientX, e.clientY, trayBounds)) return true;
   if (eventFromWeevarChrome(e)) return true;
   const top = document.elementFromPoint(e.clientX, e.clientY);
   if (!top) return false;
@@ -2249,11 +2278,21 @@ function SelectedTopBar({
   );
 }
 
-function CursorHoverLabel({ x, y, text }: { x: number; y: number; text: string }) {
-  const left = Math.min(Math.max(6, x + 12), window.innerWidth - 220);
-  const top = Math.min(Math.max(6, y - 26), window.innerHeight - 28);
+function CursorHoverLabel({
+  x,
+  y,
+  text,
+  avoidRects = [],
+}: {
+  x: number;
+  y: number;
+  text: string;
+  avoidRects?: DOMRect[];
+}) {
+  const placement = placeCursorHoverLabel(x, y, text, avoidRects);
+  if (!placement) return null;
   return (
-    <div className="wv-cursor-label" style={{ left, top }}>
+    <div className="wv-cursor-label" style={{ left: placement.left, top: placement.top }}>
       {text}
     </div>
   );

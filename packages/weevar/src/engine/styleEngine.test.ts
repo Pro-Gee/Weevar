@@ -3,8 +3,13 @@ import {
   areStyleCommitValuesEquivalent,
   classifyElement,
   cssPaintValuesEqual,
+  elementTypeLabel,
   readLineHeightAsPixelNumber,
   rgbToHex,
+  supportsCssBackgroundColor,
+  supportsCssTextColor,
+  isTransparentPickerColor,
+  combineOpaqueHexAndAlphaPercent,
 } from "./styleEngine";
 
 // Helper: create a DOM element with optional children and text
@@ -79,21 +84,109 @@ describe("classifyElement", () => {
   });
 });
 
+describe("elementTypeLabel", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("labels <p> as Paragraph", () => {
+    expect(elementTypeLabel(el("p", { text: "hello" }), "text")).toBe("Paragraph");
+  });
+
+  it("labels <button> as Button", () => {
+    expect(elementTypeLabel(el("button", { text: "Click" }), "text")).toBe("Button");
+  });
+
+  it("labels headings as Heading", () => {
+    expect(elementTypeLabel(el("h1", { text: "Title" }), "text")).toBe("Heading");
+    expect(elementTypeLabel(el("h2", { text: "Title" }), "text")).toBe("Heading");
+  });
+
+  it("labels stack and svg categories", () => {
+    expect(elementTypeLabel(el("div"), "stack")).toBe("Stack");
+    expect(elementTypeLabel(el("svg"), "svg")).toBe("SVG");
+  });
+
+  it("labels text-only div as Text", () => {
+    const d = document.createElement("div");
+    d.appendChild(document.createTextNode("hello"));
+    document.body.appendChild(d);
+    expect(elementTypeLabel(d, "text")).toBe("Text");
+  });
+});
+
+describe("supportsCssTextColor", () => {
+  it("enables font colour for text, stack, and generic categories", () => {
+    expect(supportsCssTextColor("text")).toBe(true);
+    expect(supportsCssTextColor("stack")).toBe(true);
+    expect(supportsCssTextColor("generic")).toBe(true);
+  });
+
+  it("disables font colour for svg and image categories", () => {
+    expect(supportsCssTextColor("svg")).toBe(false);
+    expect(supportsCssTextColor("image")).toBe(false);
+  });
+});
+
+describe("supportsCssBackgroundColor", () => {
+  it("enables background colour for text, stack, and generic categories", () => {
+    expect(supportsCssBackgroundColor("text")).toBe(true);
+    expect(supportsCssBackgroundColor("stack")).toBe(true);
+    expect(supportsCssBackgroundColor("generic")).toBe(true);
+  });
+
+  it("disables background colour for svg and image categories", () => {
+    expect(supportsCssBackgroundColor("svg")).toBe(false);
+    expect(supportsCssBackgroundColor("image")).toBe(false);
+  });
+});
+
+describe("isTransparentPickerColor", () => {
+  it("detects fully transparent values", () => {
+    expect(isTransparentPickerColor("transparent")).toBe(true);
+    expect(isTransparentPickerColor("#00000000")).toBe(true);
+    expect(isTransparentPickerColor("rgba(255, 255, 255, 0)")).toBe(true);
+  });
+
+  it("detects opaque values", () => {
+    expect(isTransparentPickerColor("#ff0000")).toBe(false);
+    expect(isTransparentPickerColor("#ff000080")).toBe(false);
+  });
+});
+
+describe("combineOpaqueHexAndAlphaPercent", () => {
+  it("returns 6-digit hex when opacity is 100%", () => {
+    expect(combineOpaqueHexAndAlphaPercent("#ff0000", 100)).toBe("#ff0000");
+  });
+
+  it("returns 8-digit hex when opacity is below 100%", () => {
+    expect(combineOpaqueHexAndAlphaPercent("#ff0000", 50)).toBe("#ff000080");
+  });
+
+  it("returns transparent hex when opacity is 0%", () => {
+    expect(combineOpaqueHexAndAlphaPercent("#ffffff", 0)).toBe("#ffffff00");
+  });
+});
+
 describe("rgbToHex", () => {
   it("converts rgb() to hex", () => {
     expect(rgbToHex("rgb(255, 0, 0)")).toBe("#ff0000");
   });
 
-  it("converts rgba() to hex, stripping alpha", () => {
-    expect(rgbToHex("rgba(0, 0, 0, 0.8)")).toBe("#000000");
+  it("converts rgba() with partial alpha to 8-digit hex", () => {
+    expect(rgbToHex("rgba(0, 0, 0, 0.8)")).toBe("#000000cc");
   });
 
   it("returns hex strings as-is", () => {
     expect(rgbToHex("#abc123")).toBe("#abc123");
   });
 
-  it("returns #000000 for transparent", () => {
-    expect(rgbToHex("transparent")).toBe("#000000");
+  it("returns #00000000 for transparent", () => {
+    expect(rgbToHex("transparent")).toBe("#00000000");
+  });
+
+  it("preserves zero alpha on white rgba (not opaque white)", () => {
+    expect(rgbToHex("rgba(255, 255, 255, 0)")).toBe("#ffffff00");
   });
 
   it("returns #000000 for empty string", () => {
@@ -106,6 +199,10 @@ describe("rgbToHex", () => {
 
   it("pads single-digit hex values", () => {
     expect(rgbToHex("rgb(0, 0, 15)")).toBe("#00000f");
+  });
+
+  it("reads 8-digit hex with alpha", () => {
+    expect(rgbToHex("#ff000080")).toBe("#ff000080");
   });
 });
 
@@ -137,6 +234,12 @@ describe("areStyleCommitValuesEquivalent", () => {
 
   it("treats rgb and hex as equal for colour props", () => {
     expect(areStyleCommitValuesEquivalent("color", "#ff0000", "rgb(255, 0, 0)")).toBe(true);
+  });
+
+  it("treats transparent and rgba(0,0,0,0) as equal", () => {
+    expect(
+      areStyleCommitValuesEquivalent("background-color", "transparent", "rgba(0, 0, 0, 0)"),
+    ).toBe(true);
   });
 
   it("treats equivalent px lengths as equal", () => {

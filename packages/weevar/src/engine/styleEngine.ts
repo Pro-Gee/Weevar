@@ -45,6 +45,81 @@ export function classifyElement(el: Element): ElementCategory {
   return "generic";
 }
 
+/** Whether the edit tray should offer the CSS `color` property (Style → Font Colour). */
+export function supportsCssTextColor(category: ElementCategory): boolean {
+  return category === "text" || category === "stack" || category === "generic";
+}
+
+/** Whether the edit tray should offer `background-color` in the Box section. */
+export function supportsCssBackgroundColor(category: ElementCategory): boolean {
+  return category === "text" || category === "stack" || category === "generic";
+}
+
+const TEXT_TYPE_LABELS: Record<string, string> = {
+  p: "Paragraph",
+  h1: "Heading",
+  h2: "Heading",
+  h3: "Heading",
+  h4: "Heading",
+  h5: "Heading",
+  h6: "Heading",
+  button: "Button",
+  span: "Text",
+  a: "Link",
+  label: "Label",
+  small: "Text",
+  strong: "Text",
+  em: "Text",
+  b: "Text",
+  i: "Text",
+  li: "List item",
+  blockquote: "Quote",
+  code: "Code",
+  pre: "Preformatted",
+  input: "Input",
+  textarea: "Text area",
+  td: "Table cell",
+  th: "Table header",
+  caption: "Caption",
+  figcaption: "Caption",
+  dt: "Definition term",
+  dd: "Definition",
+  legend: "Legend",
+  summary: "Summary",
+};
+
+const GENERIC_TYPE_LABELS: Record<string, string> = {
+  div: "Div",
+  section: "Section",
+  article: "Article",
+  nav: "Navigation",
+  header: "Header",
+  footer: "Footer",
+  main: "Main",
+  aside: "Aside",
+  ul: "List",
+  ol: "List",
+  form: "Form",
+  video: "Video",
+  audio: "Audio",
+  canvas: "Canvas",
+};
+
+/** Human-readable element type for the edit tray header. */
+export function elementTypeLabel(el: Element, category: ElementCategory): string {
+  const tag = el.tagName.toLowerCase();
+
+  if (category === "svg") return "SVG";
+  if (category === "image") return "Image";
+  if (category === "stack") return "Stack";
+
+  if (TEXT_TYPE_LABELS[tag]) return TEXT_TYPE_LABELS[tag];
+  if (category === "text") return "Text";
+
+  if (GENERIC_TYPE_LABELS[tag]) return GENERIC_TYPE_LABELS[tag];
+  return tag.charAt(0).toUpperCase() + tag.slice(1);
+}
+
 /**
  * Read a CSS property value from an element.
  * Prefers the element's own inline style if set; falls back to computed style.
@@ -116,24 +191,145 @@ export function normalizeFontWeightValue(raw: string): string {
   return Number.isFinite(n) ? String(n) : t;
 }
 
+export type ParsedCssColor = { r: number; g: number; b: number; alpha: number };
+
+function clamp255(n: number): number {
+  return Math.max(0, Math.min(255, Math.round(n)));
+}
+
+function expandShortHex(hex: string): string {
+  if (hex.length === 3 || hex.length === 4) {
+    return hex
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  return hex;
+}
+
+/** Parse rgb()/rgba()/hex CSS colour strings (no named colours). */
+export function parseCssColor(raw: string): ParsedCssColor | null {
+  const t = raw.trim().toLowerCase();
+  if (!t) return null;
+  if (t === "transparent" || t === "none") return { r: 0, g: 0, b: 0, alpha: 0 };
+
+  const rgba = t.match(
+    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/,
+  );
+  if (rgba) {
+    const alphaRaw = rgba[4] != null ? parseFloat(rgba[4]) : 1;
+    return {
+      r: clamp255(parseFloat(rgba[1])),
+      g: clamp255(parseFloat(rgba[2])),
+      b: clamp255(parseFloat(rgba[3])),
+      alpha: Number.isFinite(alphaRaw) ? Math.max(0, Math.min(1, alphaRaw)) : 1,
+    };
+  }
+
+  const hex = t.match(/^#([0-9a-f]{3,8})$/i);
+  if (hex) {
+    const h = expandShortHex(hex[1].toLowerCase());
+    if (h.length === 6) {
+      return {
+        r: parseInt(h.slice(0, 2), 16),
+        g: parseInt(h.slice(2, 4), 16),
+        b: parseInt(h.slice(4, 6), 16),
+        alpha: 1,
+      };
+    }
+    if (h.length === 8) {
+      return {
+        r: parseInt(h.slice(0, 2), 16),
+        g: parseInt(h.slice(2, 4), 16),
+        b: parseInt(h.slice(4, 6), 16),
+        alpha: parseInt(h.slice(6, 8), 16) / 255,
+      };
+    }
+  }
+  return null;
+}
+
+/** Normalise any browser-supported CSS colour to sRGB + alpha (canvas fallback for hsl, etc.). */
+export function normalizeCssColor(raw: string): ParsedCssColor | null {
+  const direct = parseCssColor(raw);
+  if (direct) return direct;
+  if (typeof document === "undefined") return null;
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#000000";
+    ctx.fillStyle = raw.trim();
+    return parseCssColor(ctx.fillStyle);
+  } catch {
+    return null;
+  }
+}
+
+/** Hex for tray display: `#rrggbb` opaque, `#rrggbbaa` when alpha &lt; 1. */
+export function formatCssColorHex(parsed: ParsedCssColor): string {
+  const rr = parsed.r.toString(16).padStart(2, "0");
+  const gg = parsed.g.toString(16).padStart(2, "0");
+  const bb = parsed.b.toString(16).padStart(2, "0");
+  if (parsed.alpha <= 0) return `#${rr}${gg}${bb}00`;
+  if (parsed.alpha >= 1 - 1 / 255) return `#${rr}${gg}${bb}`;
+  const aa = Math.round(parsed.alpha * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `#${rr}${gg}${bb}${aa}`;
+}
+
+export function opaqueCssColorHex(parsed: ParsedCssColor): string {
+  const rr = parsed.r.toString(16).padStart(2, "0");
+  const gg = parsed.g.toString(16).padStart(2, "0");
+  const bb = parsed.b.toString(16).padStart(2, "0");
+  return `#${rr}${gg}${bb}`;
+}
+
+export function parsePickerColorValue(value: string): ParsedCssColor {
+  return normalizeCssColor(value) ?? { r: 0, g: 0, b: 0, alpha: 1 };
+}
+
+export function isTransparentPickerColor(value: string): boolean {
+  return parsePickerColorValue(value).alpha <= 0;
+}
+
+/** Alpha as 0–100 for tray opacity field (2 decimal places). */
+export function alphaPercentFromPickerColor(value: string): number {
+  const { alpha } = parsePickerColorValue(value);
+  return Math.round(alpha * 10000) / 100;
+}
+
+export function opaqueHexFromPickerColor(value: string): string {
+  return opaqueCssColorHex(parsePickerColorValue(value));
+}
+
+/** Merge 6-digit hex with an opacity percentage into `#rrggbb` or `#rrggbbaa`. */
+export function combineOpaqueHexAndAlphaPercent(opaqueHex: string, alphaPercent: number): string {
+  const rgb = parsePickerColorValue(opaqueHex);
+  const pct = Math.max(0, Math.min(100, alphaPercent));
+  return formatCssColorHex({ r: rgb.r, g: rgb.g, b: rgb.b, alpha: pct / 100 });
+}
+
+/** Read a colour property from an element for ColorPicker (`#rrggbb` or `#rrggbbaa`). */
+export function readCssColorForPicker(el: Element, cssProperty: string): string {
+  const parsed = normalizeCssColor(readPropertyValue(el, cssProperty));
+  if (!parsed) return "#000000";
+  return formatCssColorHex(parsed);
+}
+
 /**
  * Convert an RGB or RGBA string from getComputedStyle into a hex colour string.
- * Alpha channel is stripped. If the value is already hex or a named colour, returned as-is.
- *
- * Examples:
- *   "rgb(255, 0, 0)"     → "#ff0000"
- *   "rgba(0, 0, 0, 0.8)" → "#000000"
- *   "#abc123"            → "#abc123"
- *   "transparent"        → "#000000"
+ * Preserves alpha as `#rrggbbaa` when alpha &lt; 1; fully transparent → `#00000000`.
  */
 export function rgbToHex(rgb: string): string {
-  if (!rgb || rgb === "transparent" || rgb === "none") return "#000000";
-  const m = rgb.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (!m) return rgb;
-  const r = parseInt(m[1], 10).toString(16).padStart(2, "0");
-  const g = parseInt(m[2], 10).toString(16).padStart(2, "0");
-  const b = parseInt(m[3], 10).toString(16).padStart(2, "0");
-  return `#${r}${g}${b}`;
+  const parsed = normalizeCssColor(rgb);
+  if (!parsed) {
+    const t = rgb.trim();
+    if (/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(t)) return t.toLowerCase();
+    return "#000000";
+  }
+  return formatCssColorHex(parsed);
 }
 
 const CSS_PAINT_PROPERTIES = new Set<string>([
@@ -158,10 +354,17 @@ export function cssPaintProperty(cssProperty: string): boolean {
 
 /** True when two colour strings denote the same sRGB colour (hex vs rgb(), etc.). */
 export function cssPaintValuesEqual(a: string, b: string): boolean {
-  const A = rgbToHex(a.trim());
-  const B = rgbToHex(b.trim());
-  if (A.startsWith("#") && B.startsWith("#")) return A.toLowerCase() === B.toLowerCase();
-  return A === B;
+  const A = normalizeCssColor(a.trim());
+  const B = normalizeCssColor(b.trim());
+  if (A && B) {
+    return (
+      A.r === B.r &&
+      A.g === B.g &&
+      A.b === B.b &&
+      Math.abs(A.alpha - B.alpha) < 1 / 255
+    );
+  }
+  return rgbToHex(a.trim()).toLowerCase() === rgbToHex(b.trim()).toLowerCase();
 }
 
 /**
@@ -228,7 +431,7 @@ export function readBorderValues(
   return {
     width: parseFloat(cs.borderWidth) || 0,
     style: cs.borderStyle || "none",
-    color: rgbToHex(cs.borderColor || "#000000"),
+    color: readCssColorForPicker(el, "border-color"),
   };
 }
 
