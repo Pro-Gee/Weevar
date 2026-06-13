@@ -4,7 +4,7 @@ A dev-only overlay for React apps that lets you **rearrange layout** and **edit 
 
 Weevar runs locally while your dev server is active. Nothing ships to production until you apply the generated prompts to your source code.
 
-**Current version:** see the tray footer (`v1.1.0` at time of this release).
+**Current version:** see the tray footer (`v1.2.0` at time of this release).
 
 ---
 

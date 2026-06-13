@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-22
+
+Documentation and polish release following **Weevar V2 (1.1.0)**.
+
+### Changed
+
+- **Documentation:** Rewrote `README.md`, `packages/weevar/README.md`, and all guides under `docs/` for V2 — layout + style editing, edit tray, prompts, shortcuts, configuration, troubleshooting, compatibility, security, release gates, and smoke matrix.
+- **Prompt empty state:** Updated copy from “No element moved yet” to **“No edits made yet”** to match the Overview **Total edits** label and V2 session model (layout + style).
+
+### Added
+
+- **`docs/RELEASE_NOTES_v1.2.0.md`** — release notes for this documentation pass.
+
 ## [1.1.0] - 2026-05-22
 
 Major feature release: **Weevar V2** adds live style editing alongside layout moves, a redesigned edit tray, and significantly more reliable prompt output for AI-assisted code changes.

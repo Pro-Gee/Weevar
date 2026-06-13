@@ -1,6 +1,6 @@
 {
   "name": "weevar",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Dev overlay: manipulate live UI and copy structured prompts for AI assistants",
   "homepage": "https://weevar.com",
   "repository": {
