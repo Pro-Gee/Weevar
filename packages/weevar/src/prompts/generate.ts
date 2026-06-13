@@ -3,14 +3,98 @@ import type {
   GeneratedPrompt,
   LayoutChange,
   LayoutType,
+  StyleTweak,
   TargetTool,
+  WeevarChange,
   WeevarRuntimeConfig,
 } from "../engine/layoutTypes";
+import { isTextLikeTag } from "../engine/elementText";
 
 type PromptOptions = {
   targetTool: TargetTool | "cursor";
   config?: WeevarRuntimeConfig;
 };
+
+// ─── Tailwind lookup tables (prompt suggestions only — no DOM logic) ──
+
+const TAILWIND_FONT_SIZE: Record<string, string> = {
+  "12px": "text-xs",
+  "14px": "text-sm",
+  "16px": "text-base",
+  "18px": "text-lg",
+  "20px": "text-xl",
+  "24px": "text-2xl",
+  "30px": "text-3xl",
+  "36px": "text-4xl",
+  "48px": "text-5xl",
+  "60px": "text-6xl",
+  "72px": "text-7xl",
+};
+
+const TAILWIND_FONT_WEIGHT: Record<string, string> = {
+  "100": "font-thin",
+  "200": "font-extralight",
+  "300": "font-light",
+  "400": "font-normal",
+  "500": "font-medium",
+  "600": "font-semibold",
+  "700": "font-bold",
+  "800": "font-extrabold",
+  "900": "font-black",
+};
+
+const TAILWIND_BORDER_RADIUS: Record<string, string> = {
+  "0px": "rounded-none",
+  "2px": "rounded-sm",
+  "4px": "rounded",
+  "6px": "rounded-md",
+  "8px": "rounded-lg",
+  "12px": "rounded-xl",
+  "16px": "rounded-2xl",
+  "24px": "rounded-3xl",
+};
+
+const TAILWIND_OPACITY: Record<string, string> = {
+  "0": "opacity-0",
+  "0.05": "opacity-5",
+  "0.1": "opacity-10",
+  "0.2": "opacity-20",
+  "0.25": "opacity-25",
+  "0.3": "opacity-30",
+  "0.4": "opacity-40",
+  "0.5": "opacity-50",
+  "0.6": "opacity-60",
+  "0.7": "opacity-70",
+  "0.75": "opacity-75",
+  "0.8": "opacity-80",
+  "0.9": "opacity-90",
+  "0.95": "opacity-95",
+  "1": "opacity-100",
+};
+
+const TAILWIND_TEXT_ALIGN: Record<string, string> = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+  justify: "text-justify",
+};
+
+function tailwindSuggestion(cssProperty: string, value: string): string | null {
+  switch (cssProperty) {
+    case "font-size":
+      return TAILWIND_FONT_SIZE[value] ?? null;
+    case "font-weight":
+      return TAILWIND_FONT_WEIGHT[value] ?? null;
+    case "border-radius":
+      return TAILWIND_BORDER_RADIUS[value] ?? null;
+    case "opacity":
+      return TAILWIND_OPACITY[value] ?? null;
+    case "text-align":
+      return TAILWIND_TEXT_ALIGN[value] ?? null;
+    default:
+      return null;
+  }
+}
 
 function lineText(line: number): string {
   return `line ${line}`;
@@ -35,21 +119,59 @@ function cssTagRef(id: ElementIdentity): string {
   return `<${id.tag}.${id.classList.join(".")}>`;
 }
 
+/** Prefer DOM tag+class when classes exist; fall back to component name. */
+function domFirstRef(id: ElementIdentity): string {
+  if (id.classList.length) return cssTagRef(id);
+  if (id.componentName) return `<${id.componentName}>`;
+  return cssTagRef(id);
+}
+
 function baseRef(id: ElementIdentity): string {
   if (id.componentName) return `<${id.componentName}>`;
   return cssTagRef(id);
 }
 
-function withDisambiguation(id: ElementIdentity, force = false): string {
-  const root = baseRef(id);
-  if (!force && id.componentName) return root;
-  if (id.textSnippet) return `${root.replace(/>$/, "")} "${id.textSnippet}">`;
-  if (id.classList.length && id.componentName) return `${root.replace(/>$/, "")}.${id.classList[0]}>`;
+function childCountLabel(count: number): string {
+  return count === 1 ? "1 element child" : `${count} element children`;
+}
+
+/**
+ * Human-readable ref for layout moves/reorders.
+ * Uses tag+class for styled elements, text only on text-like tags, child count for containers.
+ */
+function layoutElementRef(id: ElementIdentity, force = false): string {
+  const root = domFirstRef(id);
+  const open = root.replace(/>$/, "");
+
+  if (isTextLikeTag(id.tag) && id.textSnippet) {
+    return `${open} "${id.textSnippet}">`;
+  }
+
+  if (id.childElementCount && id.childElementCount > 0) {
+    return `${root} (${childCountLabel(id.childElementCount)})`;
+  }
+
+  if (force && id.textSnippet) {
+    return `${open} "${id.textSnippet}">`;
+  }
+
+  if (force && id.source?.line) {
+    return `${open} @line ${id.source.line}>`;
+  }
+
   return root;
 }
 
+function withDisambiguation(id: ElementIdentity, force = false): string {
+  return layoutElementRef(id, force);
+}
+
 function jsxRef(id: ElementIdentity): string {
-  return `${withDisambiguation(id).replace(/>$/, "")} />`;
+  return `${layoutElementRef(id).replace(/>$/, "")} />`;
+}
+
+function styleTargetRef(id: ElementIdentity): string {
+  return domFirstRef(id);
 }
 
 function domPathTail(id: ElementIdentity, segments = 3): string {
@@ -58,16 +180,29 @@ function domPathTail(id: ElementIdentity, segments = 3): string {
   return tail.map((s) => `${s.tag}[${s.index}]`).join(">");
 }
 
+/** Braced `{src:…; dom:…; h:…}` anchor block used by `strictRef` and style prompts. */
+function identityBlock(id: ElementIdentity): string {
+  const srcPart = id.source ? `${id.source.file}:${id.source.line}` : "source:unknown";
+  const path = domPathTail(id);
+  const hash = `h:${id.contentHash}`;
+  const inner = path
+    ? [`src:${srcPart}`, `dom:${path}`, hash].join("; ")
+    : [`src:${srcPart}`, hash].join("; ");
+  return `{${inner}}`;
+}
+
 /**
  * Non-lossy identifier for short prompts:
  * keeps human-readable symbol + concrete source/path anchors for deterministic edits.
  */
 function strictRef(id: ElementIdentity): string {
-  const core = withDisambiguation(id, true);
-  const src = id.source ? `${id.source.file}:${id.source.line}` : "source:unknown";
-  const path = domPathTail(id);
-  const hash = `h:${id.contentHash}`;
-  return path ? `${core} {src:${src}; dom:${path}; ${hash}}` : `${core} {src:${src}; ${hash}}`;
+  const core = layoutElementRef(id);
+  return `${core} ${identityBlock(id)}`;
+}
+
+function moveSubtreeNote(id: ElementIdentity): string {
+  if (!id.childElementCount || id.childElementCount <= 0) return "";
+  return ` Move the entire element subtree (${childCountLabel(id.childElementCount)}); do not split or recreate nested nodes.`;
 }
 
 function displacementAnchor(siblings: ElementIdentity[], toIndex: number): string {
@@ -75,7 +210,7 @@ function displacementAnchor(siblings: ElementIdentity[], toIndex: number): strin
   if (toIndex <= 0) return "first";
   if (toIndex >= siblings.length - 1) return "last";
   const prev = siblings[toIndex - 1];
-  return `after ${baseRef(prev)}`;
+  return `after ${layoutElementRef(prev)}`;
 }
 
 function detailedAnchor(siblings: ElementIdentity[], toIndex: number): string {
@@ -103,13 +238,13 @@ function moveSiblings(change: Extract<LayoutChange, { kind: "move" }>): ElementI
 function buildSiblingRenderData(siblings: ElementIdentity[]) {
   const counts = new Map<string, number>();
   for (const s of siblings) {
-    const k = baseRef(s);
+    const k = layoutElementRef(s);
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
   return siblings.map((s) => {
-    const k = baseRef(s);
+    const k = layoutElementRef(s);
     const repeated = (counts.get(k) ?? 0) > 1;
-    return withDisambiguation(s, repeated);
+    return layoutElementRef(s, repeated);
   });
 }
 
@@ -154,7 +289,7 @@ function shortMove(change: Extract<LayoutChange, { kind: "move" }>): string {
   const order = buildSiblingRenderData(siblings)
     .map((s, i) => `${i}: ${s}`)
     .join(" | ");
-  return `Move ${targetRef}${line} from ${fromRef}${fromLoc ? ` (${fromLoc})` : ""} (child index ${change.fromIndex}) into ${toRef}${toLoc ? ` (${toLoc})` : ""} at child index ${change.toIndex} (${shortAnchor}). Destination order after move: ${order}. Preserve all props.`;
+  return `Move ${targetRef}${line} from ${fromRef}${fromLoc ? ` (${fromLoc})` : ""} (child index ${change.fromIndex}) into ${toRef}${toLoc ? ` (${toLoc})` : ""} at child index ${change.toIndex} (${shortAnchor}). Destination order after move: ${order}.${moveSubtreeNote(change.target)} Preserve all props and nested structure unchanged.`;
 }
 
 function detailedReorder(change: Extract<LayoutChange, { kind: "reorder" }>, tool: PromptOptions["targetTool"]): string {
@@ -174,12 +309,12 @@ function detailedReorder(change: Extract<LayoutChange, { kind: "reorder" }>, too
       return `${i + 1}. ${refs[i]}${loc}${moved}`;
     })
     .join("\n");
-  const heading = `# Reorder within ${baseRef(change.parent)}`;
+  const heading = `# Reorder within ${layoutElementRef(change.parent)}`;
   const fileLine = `**File:** ${file}`;
   const classSnippet = change.parent.classList.length
     ? ` — \`<${change.parent.tag} className="${change.parent.classList.join(" ")}">\``
     : "";
-  const container = `**Container:** ${baseRef(change.parent)}${containerLine ? ` at line ${containerLine}` : ""}${classSnippet}`;
+  const container = `**Container:** ${layoutElementRef(change.parent)}${containerLine ? ` at line ${containerLine}` : ""}${classSnippet}`;
   const layout = `**Layout:** ${formatLayoutType(change.layoutType)}`;
   const move = [
     "## Move",
@@ -189,7 +324,7 @@ function detailedReorder(change: Extract<LayoutChange, { kind: "reorder" }>, too
   ].join("\n");
   const constraints = [
     "## Constraints",
-    `- Preserve all props on ${baseRef(change.target)}`,
+    `- Preserve all props on ${layoutElementRef(change.target)}`,
     `- Don't modify the ${formatLayoutType(change.layoutType)} layout`,
     "- Don't introduce wrapper elements",
     "- Don't touch other components in this file",
@@ -220,25 +355,35 @@ function detailedMove(change: Extract<LayoutChange, { kind: "move" }>, tool: Pro
       return `${i + 1}. ${refs[i]}${loc}${moved}`;
     })
     .join("\n");
-  const source = `**Source:** ${baseRef(change.fromParent)}${change.fromParent.source ? ` in ${formatLocation(change.fromParent.source)}` : ""} (${formatLayoutType(change.fromLayoutType)} layout)`;
-  const destination = `**Destination:** ${baseRef(change.toParent)}${change.toParent.source ? ` in ${formatLocation(change.toParent.source)}` : ""} (${formatLayoutType(change.toLayoutType)} layout)`;
+  const source = `**Source:** ${layoutElementRef(change.fromParent)}${change.fromParent.source ? ` in ${formatLocation(change.fromParent.source)}` : ""} (${formatLayoutType(change.fromLayoutType)} layout)`;
+  const destination = `**Destination:** ${layoutElementRef(change.toParent)}${change.toParent.source ? ` in ${formatLocation(change.toParent.source)}` : ""} (${formatLayoutType(change.toLayoutType)} layout)`;
   const anchor = displacementAnchor(siblings, change.toIndex);
+  const targetDom = layoutElementRef(change.target);
   const move = [
     "## Move",
     `${jsxRef(change.target)}${change.target.source ? ` at ${formatLocation(change.target.source)}` : ""}`,
-    `Remove from: ${baseRef(change.fromParent)}, index ${change.fromIndex}`,
-    `Insert into: ${baseRef(change.toParent)}, index ${change.toIndex} (${anchor})`,
+    `Remove from: ${layoutElementRef(change.fromParent)}, child index ${change.fromIndex}`,
+    `Insert into: ${layoutElementRef(change.toParent)}, child index ${change.toIndex} (${anchor})`,
+    ...(change.target.childElementCount && change.target.childElementCount > 0
+      ? [
+          "",
+          `**Subtree:** ${targetDom} includes ${childCountLabel(change.target.childElementCount)}. Cut and paste the element with all nested JSX unchanged — do not extract, split, or recreate children.`,
+        ]
+      : []),
   ].join("\n");
   const constraints = [
     "## Constraints",
-    `- Preserve all props on ${baseRef(change.target)}`,
-    `- Don't modify ${baseRef(change.fromParent)} beyond removing the element`,
-    `- Don't modify ${baseRef(change.toParent)}'s layout or styling`,
+    `- Preserve all props on ${targetDom}`,
+    `- Don't modify ${layoutElementRef(change.fromParent)} beyond removing the element`,
+    `- Don't modify ${layoutElementRef(change.toParent)}'s layout or styling`,
     "- Don't introduce wrapper elements",
+    ...(change.target.childElementCount && change.target.childElementCount > 0
+      ? ["- Move the full subtree; child index refers to the container element, not its text content"]
+      : []),
   ].join("\n");
 
   const parts = [
-    `# Move ${baseRef(change.target)} across containers`,
+    `# Move ${targetDom} across containers`,
     "",
     source,
     destination,
@@ -259,10 +404,123 @@ function detailedMove(change: Extract<LayoutChange, { kind: "move" }>, tool: Pro
   return parts.join("\n");
 }
 
+function shortStyleTweak(change: StyleTweak): string {
+  const ref = styleTargetRef(change.target);
+  const block = identityBlock(change.target);
+
+  const displayChange = change.changes.find((c) => c.cssProperty === "display");
+  const toDisplay = displayChange?.toValue ?? "";
+  const relevantChanges = change.changes.filter((c) => {
+    if (toDisplay === "grid" && c.cssProperty === "flex-direction") return false;
+    return true;
+  });
+
+  const props = relevantChanges
+    .map((c) => `\`${c.cssProperty}\` ${c.fromValue} → ${c.toValue}`)
+    .join("; ");
+
+  const borderNote = change.borderSummary
+    ? ` Effective border: ${change.borderSummary}.`
+    : "";
+
+  return `Update styles on ${ref} ${block}: ${props}.${borderNote} Preserve all props and event handlers.`;
+}
+
+function detailedStyleTweak(change: StyleTweak, options: PromptOptions): string {
+  const showTailwind = options.config?.prompts?.tailwindVerbatimClasses === true;
+  const ref = styleTargetRef(change.target);
+  const src = change.target.source;
+  const classes = change.target.classList;
+
+  const fileLine = src ? `**File:** ${src.file}:${src.line}` : null;
+  const block = identityBlock(change.target);
+  const elementLine = classes.length
+    ? `**Element:** <${change.target.tag} className="${classes.join(" ")}"> ${block}`
+    : `**Element:** <${change.target.tag}> ${block}`;
+  const categoryLine = `**Category:** ${change.elementCategory}`;
+
+  const tableHeader = showTailwind
+    ? "| Property | CSS property | Before | After | Tailwind suggestion |"
+    : "| Property | CSS property | Before | After |";
+  const tableSep = showTailwind
+    ? "|---|---|---|---|---|"
+    : "|---|---|---|---|";
+
+  const rows = change.changes.map((c) => {
+    const fromSug = showTailwind ? tailwindSuggestion(c.cssProperty, c.fromValue) : null;
+    const toSug = showTailwind ? tailwindSuggestion(c.cssProperty, c.toValue) : null;
+    const twCell = showTailwind
+      ? ` | ${fromSug && toSug ? `\`${fromSug}\` → \`${toSug}\`` : "—"} |`
+      : "";
+    return `| ${c.displayLabel} | \`${c.cssProperty}\` | \`${c.fromValue}\` | \`${c.toValue}\` |${twCell}`;
+  });
+
+  const howToApply = showTailwind
+    ? [
+        "## How to apply",
+        "",
+        "**If using Tailwind CSS:** Replace class values using the Tailwind suggestion column.",
+        "If the exact value doesn't exist in your config, use the nearest matching Tailwind utility.",
+        "",
+        "**If using plain CSS, CSS Modules, or inline styles:** Apply the \"After\" values directly.",
+      ].join("\n")
+    : 'Apply the "After" values for each CSS property listed to the target element.';
+
+  const constraints = [
+    "## Constraints",
+    `- Only modify the specified properties on ${ref}`,
+    "- Preserve all existing props, event handlers, and other styles",
+    "- Do not introduce wrapper elements",
+    "- Do not change the component's structure or other components in the file",
+  ].join("\n");
+
+  const parts: string[] = [
+    `# Update styles on ${ref}`,
+    "",
+    ...(fileLine ? [fileLine] : []),
+    elementLine,
+    categoryLine,
+    "",
+    "## Style changes",
+    tableHeader,
+    tableSep,
+    ...rows,
+    ...(change.borderSummary
+      ? ["", `**Effective border:** ${change.borderSummary}`]
+      : []),
+    "",
+    howToApply,
+    "",
+    constraints,
+  ];
+
+  if (!src) {
+    parts.push(
+      "",
+      "_Tip: install the weevar Vite plugin for source-accurate file and line references in prompts._",
+    );
+  }
+
+  return parts.join("\n");
+}
+
 export function generatePrompt(
-  change: LayoutChange,
+  change: WeevarChange,
   options: PromptOptions,
 ): GeneratedPrompt | null {
+  if (change.kind === "style-tweak") {
+    if (!change.changes.length) return null;
+    const targetTool = options.targetTool === "cursor" ? "codex" : options.targetTool;
+    return {
+      short: shortStyleTweak(change),
+      detailed: detailedStyleTweak(change, { ...options, targetTool }),
+      meta: {
+        targetTool,
+        timestamp: Date.now(),
+        change,
+      },
+    };
+  }
   if (change.kind === "reorder" && change.fromIndex === change.toIndex) return null;
   if (
     change.kind === "move" &&

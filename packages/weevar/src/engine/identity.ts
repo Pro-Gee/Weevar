@@ -1,3 +1,4 @@
+import { directTextContent, isTextLikeTag } from "./elementText";
 import { getDomLabel } from "./domLabel";
 import { elementChildren } from "./elementChildren";
 import {
@@ -41,8 +42,13 @@ export function buildElementIdentity(el: Element): ElementIdentity {
   const classes = (el as HTMLElement).classList
     ? Array.from((el as HTMLElement).classList)
     : [];
+  const tag = el.tagName.toLowerCase();
   const text = (el.textContent ?? "").trim().slice(0, 120);
-  const textSnippet = text.slice(0, 30);
+  const directText = directTextContent(el);
+  const childElementCount = elementChildren(el).length;
+  const textLike = isTextLikeTag(tag);
+  const labelText = textLike ? directText || (childElementCount === 0 ? text : "") : "";
+  const textSnippet = labelText ? labelText.slice(0, 30) : undefined;
   const fiberPath = buildFiberPath(el);
   const debugFromFiber = [...fiberPath].reverse().find((s) => s.source)?.source;
   const fromAttr = parseDataWvSource(el);
@@ -55,10 +61,11 @@ export function buildElementIdentity(el: Element): ElementIdentity {
     fiberPath: fiberPath.length ? fiberPath : undefined,
     source,
     domPath: domPathFromBody(el),
-    tag: el.tagName.toLowerCase(),
+    tag,
     classList: classes,
     contentHash: simpleHash(text),
-    textSnippet: textSnippet || undefined,
+    textSnippet,
+    childElementCount: childElementCount > 0 ? childElementCount : undefined,
     label: componentName ? `<${componentName}>` : getDomLabel(el),
     componentName,
     testId,

@@ -10,6 +10,7 @@ export const OVERLAY_CSS = `
   --wv-accent: #0099ff;
   --wv-success: #00c896;
   --wv-danger: #ff4d4f;
+  --wv-selection: #777778;
   --wv-ui: 13px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   --wv-mono: 12px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
@@ -22,6 +23,7 @@ export const OVERLAY_CSS = `
   pointer-events: none;
   font: var(--wv-ui);
   color: #e8eaed;
+  color-scheme: dark;
 }
 
 .wv-root,
@@ -528,6 +530,10 @@ export const OVERLAY_CSS = `
   height: 340px;
   z-index: 25;
   pointer-events: auto;
+  overflow: visible;
+}
+.wv-tray-stack.wv-tray-stack--edit {
+  height: 800px;
 }
 .wv-tray-stack-layer {
   position: absolute;
@@ -750,8 +756,10 @@ export const OVERLAY_CSS = `
 /* Figma overlay redesign overrides */
 .wv-tool-button {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  top: 24px;
+  right: 24px;
+  bottom: auto;
+  left: auto;
   width: 50px;
   height: 50px;
   padding: 14px;
@@ -835,8 +843,10 @@ export const OVERLAY_CSS = `
 
 .wv-dock {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  top: 24px;
+  right: 24px;
+  bottom: auto;
+  left: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -926,7 +936,7 @@ export const OVERLAY_CSS = `
   bottom: 20px;
   width: 250px;
   height: 340px;
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--weevar-dark, #111113);
   border: 1px solid rgba(235, 235, 235,0.04);
   padding: 8px 0 6px;
@@ -1032,13 +1042,22 @@ export const OVERLAY_CSS = `
 .wv-tray-content {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.wv-tray-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 .wv-tray-content-summary {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   padding: 16px 16px 16px;
   box-sizing: border-box;
 }
@@ -1088,9 +1107,10 @@ export const OVERLAY_CSS = `
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   min-height: 0;
-  padding: 14px 16px;
+  padding: 14px;
   box-sizing: border-box;
 }
 .wv-tray-content-selection .wv-tray-card {
@@ -1521,4 +1541,1875 @@ export const OVERLAY_CSS = `
 .wv-btn { border-radius: 999px; border: none; background: rgba(235, 235, 235,0.05); color: #EBEBEB; height: 28px; font-size: 10px; }
 .wv-btn:not(.wv-btn-primary), .wv-btn-danger { display: none; }
 .wv-btn-primary { font-weight: 400; }
+
+/* ─── Edit tray + font weight (dropdown stays in tray; tray layer uses transform) ─ */
+.wv-edit-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+.wv-edit-tray--hidden { visibility: hidden; pointer-events: none; }
+.wv-edit-tray-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.wv-edit-tray-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 100%;
+  color: var(--weevar-grey100, #868689);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wv-edit-tray-props-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  border: none;
+  border-radius: 100px;
+  background: rgba(235, 235, 235, 0.05);
+  color: #868689;
+  cursor: pointer;
+  line-height: 0;
+}
+.wv-edit-tray-props-btn--active {
+  color: #ebebeb;
+  background: rgba(235, 235, 235, 0.1);
+}
+.wv-edit-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #58585d;
+  margin-top: 4px;
+}
+.wv-edit-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.wv-prop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.wv-prop-label {
+  font-size: 11px;
+  color: #868689;
+  flex-shrink: 0;
+}
+.wv-weight-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 100%;
+}
+.wv-weight-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+.wv-weight-native {
+  flex: 0 0 auto;
+  min-width: 56px;
+  max-width: 40%;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--wv-border);
+  background: rgba(235, 235, 235, 0.06);
+  color: #ebebeb;
+  font-size: 11px;
+  cursor: pointer;
+}
+.wv-weight-custom-input {
+  flex: 1 1 72px;
+  min-width: 48px;
+  width: 0;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--wv-border);
+  background: rgba(235, 235, 235, 0.06);
+  color: #ebebeb;
+  font-size: 11px;
+}
+
+/* ─── Opacity card (Figma 324:8121 + hover scrub) ──────────────────────── */
+.wv-opacity-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.wv-opacity-card--interactive {
+  cursor: ew-resize;
+}
+
+.wv-opacity-card-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  height: 7px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.wv-opacity-card-tick {
+  flex: 0 0 2px;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #414144;
+}
+
+.wv-opacity-card-tick-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-opacity-card-ticks--dim .wv-opacity-card-tick {
+  opacity: 0.3;
+}
+
+.wv-opacity-card-ticks--bright .wv-opacity-card-tick {
+  opacity: 1;
+}
+
+.wv-opacity-card-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  height: 100%;
+  background: #58585d;
+  pointer-events: none;
+}
+
+.wv-opacity-card--interactive .wv-opacity-card-fill {
+  background: rgba(88, 88, 93, 0.8);
+}
+
+.wv-opacity-card-thumb {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: #ebebeb;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.wv-opacity-card-thumb--dim {
+  opacity: 0.3;
+}
+
+.wv-opacity-card-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+
+.wv-opacity-card-label {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-opacity-card-value-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+  min-width: 0;
+  pointer-events: auto;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.wv-opacity-card-value-input {
+  width: auto;
+  min-width: 20px;
+  max-width: 48px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  text-align: right;
+  outline: none;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.wv-opacity-card-value-unit {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  pointer-events: none;
+}
+
+.wv-opacity-card--editing-value {
+  cursor: default;
+}
+
+.wv-opacity-card--editing-value.wv-opacity-card--interactive {
+  cursor: default;
+}
+
+/* ─── Layout type selector icons ─────────────────────────────────── */
+.wv-layout-type-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* ─── 3×3 arrangement grid ─────────────────────────────────────────── */
+.wv-alignment-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.wv-alignment-dot {
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.wv-alignment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.wv-alignment-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: rgba(235, 235, 235, 0.05);
+  color: #58585d;
+  cursor: pointer;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.wv-alignment-cell:hover:not(.wv-alignment-cell--active) {
+  color: #ebebeb;
+}
+
+.wv-alignment-cell--active,
+.wv-alignment-cell--active:hover {
+  background: rgba(235, 235, 235, 0.05);
+  color: #c7c7c7;
+}
+
+/* ─── Alt-measure spacing guides (Figma-style) ─────────────────────── */
+.wv-spacing-measure {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 29;
+}
+
+.wv-spacing-line {
+  position: fixed;
+  background: #ff375f;
+  pointer-events: none;
+}
+
+.wv-spacing-line--horizontal {
+  height: 1px;
+}
+
+.wv-spacing-line--vertical {
+  width: 1px;
+}
+
+.wv-spacing-label {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #ff375f;
+  color: #fff;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ─── V2 EditTray shell ─────────────────────────────────────────────── */
+
+.wv-edit-tray {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  font-size: 12px;
+  color: #e8eaed;
+}
+
+.wv-edit-tray--hidden {
+  display: none;
+}
+
+.wv-edit-tray-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 8px;
+  min-width: 0;
+}
+
+.wv-edit-tray-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 100%;
+  color: var(--weevar-grey100, #868689);
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wv-edit-tray-props-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  border: none;
+  border-radius: 100px;
+  background: rgba(235, 235, 235, 0.05);
+  color: #868689;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.wv-edit-tray-props-btn:hover {
+  color: #ebebeb;
+  background: rgba(235, 235, 235, 0.08);
+}
+.wv-edit-tray-props-btn--active {
+  color: #ebebeb;
+  background: rgba(235, 235, 235, 0.1);
+}
+.wv-edit-tray-props-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* ─── Expanded element properties card ───────────────────────────────── */
+
+.wv-edit-props-card {
+  margin-bottom: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(235, 235, 235, 0.05);
+  overflow: hidden;
+}
+
+.wv-edit-props-line {
+  margin: 0;
+  word-break: break-word;
+}
+
+.wv-edit-props-key {
+  color: #aaa0fa;
+}
+
+.wv-edit-props-val {
+  color: var(--weevar-light, #ebebeb);
+}
+
+.wv-edit-props-empty {
+  margin: 0;
+  color: #868689;
+}
+
+.wv-edit-props-card,
+.wv-edit-props-line,
+.wv-edit-props-key,
+.wv-edit-props-val,
+.wv-edit-props-empty {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 11px !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  line-height: 170% !important;
+}
+
+/* ─── Controls container ─────────────────────────────────────────────── */
+
+.wv-edit-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 0 8px;
+}
+
+.wv-edit-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wv-success);
+  padding: 10px 0 4px;
+  margin-top: 4px;
+}
+
+.wv-prop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  min-height: 28px;
+}
+
+.wv-prop-label {
+  font-size: 11px;
+  color: #aaa;
+  flex: 0 0 72px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── NumberInput ────────────────────────────────────────────────────── */
+
+.wv-number-input {
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  color: #e8eaed;
+  font-size: 11px;
+  font-family: inherit;
+  height: 24px;
+  padding: 0 6px;
+  width: 60px;
+  text-align: right;
+  outline: none;
+  transition: border-color 0.15s;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.wv-number-input:focus { border-color: var(--wv-accent); }
+.wv-number-input:disabled,
+.wv-number-input-wrap .wv-number-input:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+/* NumberInput with unit: border on wrap; numeric field + non-editable suffix */
+.wv-number-input-wrap {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: stretch;
+  box-sizing: border-box;
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  height: 24px;
+  min-width: 60px;
+  max-width: 100%;
+  transition: border-color 0.15s;
+  pointer-events: auto;
+}
+.wv-number-input-wrap:focus-within {
+  border-color: var(--wv-accent);
+}
+.wv-number-input-wrap .wv-number-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: 96px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 2px 0 6px;
+  height: 100%;
+  box-sizing: border-box;
+}
+.wv-number-input-wrap .wv-number-input:focus {
+  border-color: transparent;
+  outline: none;
+}
+.wv-number-input-unit {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 6px 0 0;
+  font-size: 11px;
+  font-family: inherit;
+  color: #9aa0a6;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ─── SelectControl ──────────────────────────────────────────────────── */
+
+.wv-select {
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  color: #e8eaed;
+  font-size: 11px;
+  font-family: inherit;
+  height: 24px;
+  padding: 0 4px;
+  outline: none;
+  cursor: pointer;
+  pointer-events: auto;
+  flex: 1;
+}
+.wv-select:focus { border-color: var(--wv-accent); }
+
+/* ─── SegmentedControl ───────────────────────────────────────────────── */
+
+.wv-segmented {
+  display: flex;
+  gap: 2px;
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  padding: 2px;
+  pointer-events: auto;
+}
+
+.wv-segmented-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: #888;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.1s, color 0.1s;
+}
+.wv-segmented-btn:hover { color: #e8eaed; }
+.wv-segmented-btn[data-active="true"] {
+  background: var(--wv-accent);
+  color: #fff;
+}
+
+/* ─── WeightSelect ───────────────────────────────────────────────────── */
+
+.wv-weight-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  color: #e8eaed;
+  font-size: 12px;
+  font-family: inherit;
+  height: 24px;
+  padding: 0 6px;
+  cursor: pointer;
+  pointer-events: auto;
+  min-width: 60px;
+}
+.wv-weight-trigger:hover { border-color: var(--wv-accent); }
+
+.wv-weight-dropdown {
+  background: #1e2228;
+  border: 1px solid var(--wv-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.wv-weight-custom-row { padding: 6px; }
+
+.wv-weight-custom-input {
+  width: 100%;
+  background: var(--wv-bg);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  color: #e8eaed;
+  font-size: 12px;
+  font-family: inherit;
+  height: 24px;
+  padding: 0 6px;
+  outline: none;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+.wv-weight-custom-input:focus { border-color: var(--wv-accent); }
+
+.wv-weight-option {
+  display: block;
+  width: 100%;
+  padding: 5px 12px;
+  background: none;
+  border: none;
+  color: #e8eaed;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.wv-weight-option:hover { background: var(--wv-border); }
+.wv-weight-option--active { color: var(--wv-accent); }
+
+/* ─── Typography fields (Figma card rows) ───────────────────────────── */
+
+.wv-typo-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-typo-card,
+.wv-typo-icon-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 34px;
+  min-width: 0;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.wv-typo-card {
+  padding: 8px 10px;
+}
+
+.wv-typo-icon-card {
+  flex: 1 1 0;
+  padding: 8px 10px 8px 8px;
+  color: #c7c7c7;
+}
+
+.wv-typo-field-icon {
+  display: block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  max-width: 16px;
+  max-height: 16px;
+}
+
+.wv-typo-card-label {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-card-select {
+  position: relative;
+  cursor: pointer;
+}
+
+/* ─── Tray dropdown (selection tray) ─────────────────────────────────── */
+
+.wv-tray-dropdown {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-tray-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+  font: inherit;
+  color: #c7c7c7;
+}
+
+.wv-tray-dropdown-trigger--border {
+  color: #c7c7c7;
+  gap: 8px;
+}
+
+.wv-tray-dropdown-value--border {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.wv-tray-dropdown-trailing--end {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.wv-tray-dropdown-trigger:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.wv-tray-dropdown-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.wv-tray-dropdown-value {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wv-tray-dropdown-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #58585d;
+  transition: transform 0.15s ease;
+}
+
+.wv-tray-dropdown-chevron .wv-typo-chevron {
+  display: block;
+}
+
+.wv-tray-dropdown-chevron--open {
+  transform: rotate(180deg);
+}
+
+.wv-tray-dropdown-chevron-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+}
+
+.wv-tray-dropdown-chevron-trigger:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.wv-tray-dropdown-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(235, 235, 235, 0.04);
+  background: #18181a;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.wv-tray-dropdown-menu--overlay {
+  position: absolute;
+  z-index: 50;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+}
+
+.wv-tray-dropdown .wv-tray-dropdown-menu--overlay {
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  width: auto;
+}
+
+.wv-tray-dropdown-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #c7c7c7;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.wv-tray-dropdown-option:hover {
+  background: rgba(235, 235, 235, 0.02);
+  color: #ebebeb;
+}
+
+.wv-tray-dropdown-option--active {
+  background: rgba(235, 235, 235, 0.08);
+  color: #ebebeb;
+}
+
+.wv-tray-dropdown-option--active:hover {
+  background: rgba(235, 235, 235, 0.05);
+}
+
+.wv-dimension-dropdown .wv-dimension-row {
+  width: 100%;
+}
+
+.wv-dimension-label-trigger {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wv-dimension-label-trigger .wv-typo-card-label {
+  pointer-events: none;
+}
+
+.wv-weight-wrap--card.wv-tray-dropdown > .wv-typo-card {
+  width: 100%;
+}
+
+.wv-card-select-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.wv-card-select-value {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-card-select .wv-typo-chevron {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.wv-card-select-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.wv-typo-dual-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Dimension fields — W/H side by side + aspect lock (SVG, Box) */
+.wv-dimension-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-dimension-row .wv-typo-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-dimension-label-select {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.wv-dimension-label-select .wv-typo-card-label {
+  pointer-events: none;
+}
+
+.wv-dimension-label-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.wv-dimension-mode-value {
+  flex: 0 1 auto;
+  min-width: 24px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  text-align: right;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wv-dimension-mode-value:hover {
+  color: #ebebeb;
+}
+
+.wv-typo-chevron {
+  display: block;
+  flex-shrink: 0;
+  color: #58585d;
+}
+
+.wv-number-input--card,
+.wv-number-input-wrap.wv-number-input--card {
+  border: none;
+  background: transparent;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: none;
+  box-shadow: none;
+}
+
+.wv-number-input--card {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 24px;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif !important;
+  font-size: 11px !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  line-height: 100% !important;
+  color: #c7c7c7 !important;
+  text-align: right;
+}
+
+.wv-number-input-wrap.wv-number-input--card:focus-within {
+  border: none;
+  outline: none;
+}
+
+.wv-number-input-wrap.wv-number-input--card .wv-number-input:focus {
+  outline: none;
+}
+
+.wv-number-input-wrap.wv-number-input--card .wv-number-input-unit {
+  display: none;
+}
+
+.wv-weight-wrap--card {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wv-weight-wrap--card .wv-weight-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: auto;
+  min-width: 0;
+}
+
+.wv-weight-wrap--card .wv-weight-custom-input--card {
+  flex: 0 1 auto;
+  min-width: 24px;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #c7c7c7;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  text-align: right;
+  outline: none;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.wv-weight-card-chevron {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.wv-weight-native--card-menu {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+.wv-segmented--typo {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.wv-segmented--typo .wv-segmented-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  height: 100%;
+  margin: 0;
+  padding: 8px;
+  border: none;
+  border-radius: 0;
+  background: rgba(235, 235, 235, 0.05);
+  color: #c7c7c7;
+  box-sizing: border-box;
+}
+
+.wv-segmented--typo .wv-segmented-btn:first-child {
+  border-radius: 12px 0 0 12px;
+}
+
+.wv-segmented--typo .wv-segmented-btn:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.wv-segmented--typo .wv-segmented-btn:hover:not([data-active="true"]) {
+  color: #ebebeb;
+}
+
+.wv-segmented--typo .wv-segmented-btn[data-active="true"],
+.wv-segmented--typo .wv-segmented-btn[data-active="true"]:hover {
+  background: #58585d;
+  color: #ebebeb;
+}
+
+/* ─── ColorPicker ────────────────────────────────────────────────────── */
+
+.wv-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.wv-color-row--disabled {
+  opacity: 0.42;
+}
+
+.wv-color-row--disabled .wv-color-swatch {
+  cursor: default;
+}
+
+.wv-color-swatch {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  border: none;
+  box-shadow: inset 0 0 0 1px #262628;
+  cursor: pointer;
+  flex-shrink: 0;
+  pointer-events: auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.wv-color-swatch--card {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(235, 235, 235, 0.05);
+}
+
+.wv-color-native {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: auto;
+  border: none;
+  padding: 0;
+}
+
+.wv-color-hex {
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  color: #e8eaed;
+  font-size: 11px;
+  font-family: monospace;
+  height: 22px;
+  padding: 0 5px;
+  width: 72px;
+  outline: none;
+  pointer-events: auto;
+}
+.wv-color-hex:focus { border-color: var(--wv-accent); }
+
+.wv-color-alpha-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  pointer-events: auto;
+  margin-left: 10px;
+}
+
+.wv-color-alpha {
+  background: var(--wv-panel);
+  border: 1px solid var(--wv-border);
+  border-radius: 4px;
+  color: #e8eaed;
+  font-size: 11px;
+  font-family: monospace;
+  height: 22px;
+  padding: 0 5px;
+  width: 40px;
+  outline: none;
+  pointer-events: auto;
+  text-align: right;
+}
+.wv-color-alpha:focus { border-color: var(--wv-accent); }
+
+.wv-color-alpha-unit {
+  color: #888;
+  font-size: 11px;
+  font-family: monospace;
+  pointer-events: none;
+}
+
+/* Figma card layout (471:2183) — two rows + divider */
+.wv-color-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.wv-color-card--disabled {
+  opacity: 0.42;
+}
+
+.wv-color-card--disabled .wv-color-swatch {
+  cursor: default;
+}
+
+.wv-color-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-color-card-label {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-color-card-value {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wv-color-card-hex,
+.wv-color-card-alpha {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif !important;
+  font-size: 11px !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  line-height: 100% !important;
+  color: #c7c7c7 !important;
+  text-align: right;
+  outline: none;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.wv-color-card-hex:focus,
+.wv-color-card-alpha:focus {
+  outline: none;
+}
+
+.wv-color-card-alpha-unit {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  pointer-events: none;
+}
+
+.wv-color-card-divider {
+  display: block;
+  width: auto;
+  height: 0;
+  min-height: 0;
+  margin: 0 -10px;
+  padding: 0;
+  border: none;
+  border-top: 1px solid rgba(235, 235, 235, 0.05);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+/* ─── Style section (Figma) ──────────────────────────────────────────── */
+
+.wv-style-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-section-divider {
+  display: block;
+  width: 100%;
+  height: 0;
+  min-height: 0;
+  margin: 16px 0;
+  padding: 0;
+  border: none;
+  border-top: 1px solid rgba(235, 235, 235, 0.05);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+/* Box divider when no type-specific section precedes it (e.g. generic). */
+.wv-edit-controls > .wv-section-divider:first-child {
+  margin-top: 0;
+}
+
+.wv-style-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-style-section-title {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #868689;
+  white-space: nowrap;
+}
+
+.wv-style-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: #484848;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+}
+
+.wv-style-section-toggle:hover {
+  color: #c7c7c7;
+}
+
+/* Box section — Figma 324:7710 (16px below divider, 12px title to content) */
+.wv-box-section {
+  margin-top: 0;
+}
+
+.wv-box-section.wv-style-section {
+  gap: 12px;
+}
+
+.wv-visibility-section.wv-style-section {
+  gap: 12px;
+}
+
+.wv-layout-section.wv-style-section {
+  gap: 12px;
+}
+
+.wv-layout-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-layout-gap-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-layout-gap-card,
+.wv-layout-columns-card {
+  width: 100%;
+}
+
+.wv-layout-gap-row .wv-layout-gap-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-visibility-section-body {
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-section-divider + .wv-box-section {
+  margin-top: 0;
+}
+
+.wv-section-divider + .wv-layout-section {
+  margin-top: 0;
+}
+
+.wv-box-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-section-body > .wv-edit-section-label {
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #868689;
+}
+
+.wv-box-section-body .wv-box-header {
+  margin-bottom: 0;
+}
+
+/* Box spacing — Figma 337:1994 / 324:8196 */
+.wv-box-spacing-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-spacing-cards,
+.wv-box-spacing-sides {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-box-spacing-cards {
+  gap: 8px;
+}
+
+.wv-box-spacing-sides {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wv-box-spacing-sides-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-spacing-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-box-spacing-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  margin: 0;
+  border: 1px solid rgba(235, 235, 235, 0.05);
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  color: #ffffff;
+  cursor: pointer;
+  pointer-events: auto;
+  box-sizing: border-box;
+  line-height: 0;
+}
+
+.wv-box-spacing-toggle:hover:not(.wv-box-spacing-toggle--active):not(:disabled) {
+  background: rgba(235, 235, 235, 0.08);
+}
+
+.wv-box-spacing-toggle--active,
+.wv-box-spacing-toggle--active:hover {
+  background: #58585d;
+}
+
+.wv-box-spacing-toggle-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ─── BoxControl (legacy radius header) ──────────────────────────────── */
+
+.wv-box-control { padding: 4px 0; }
+
+.wv-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.wv-box-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #666;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.1s, border-color 0.1s;
+}
+.wv-box-toggle:hover { color: #e8eaed; border-color: var(--wv-border); }
+.wv-box-toggle--active { color: var(--wv-accent); border-color: var(--wv-accent); }
+
+.wv-box-vh-row {
+  display: flex;
+  gap: 8px;
+}
+
+.wv-box-sides-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.wv-box-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wv-box-axis-label {
+  font-size: 10px;
+  color: #666;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ─── Box subsections (Border, Corner Radius, …) ─────────────────────── */
+
+.wv-box-subsection,
+.wv-border-section,
+.wv-radius-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-subsection-title,
+.wv-border-section-title {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #868689;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
+.wv-border-style-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  color: #c7c7c7;
+  cursor: pointer;
+}
+
+.wv-border-style-value {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.wv-border-style-card .wv-typo-chevron {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.wv-border-style-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.wv-box-spacing-cards .wv-border-weight-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-box-spacing-sides-row .wv-border-weight-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-border-weight-card--disabled .wv-typo-card-label {
+  opacity: 0.42;
+}
+
+.wv-box-spacing-toggle:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+/* ─── RadiusControl ──────────────────────────────────────────────────── */
+/* Selection tray: 14px horizontal inset is only on .wv-tray-content-selection */
+.wv-tray-content-selection .wv-edit-tray-head,
+.wv-tray-content-selection .wv-typo-stack,
+.wv-tray-content-selection .wv-section-divider,
+.wv-tray-content-selection .wv-style-section,
+.wv-tray-content-selection .wv-box-section,
+.wv-tray-content-selection .wv-visibility-section,
+.wv-tray-content-selection .wv-layout-section,
+.wv-tray-content-selection .wv-edit-section-label,
+.wv-tray-content-selection .wv-prop-row,
+.wv-tray-content-selection .wv-alignment-grid,
+.wv-tray-content-selection .wv-box-spacing-row,
+.wv-tray-content-selection .wv-border-section,
+.wv-tray-content-selection .wv-radius-section,
+.wv-tray-content-selection .wv-box-subsection,
+.wv-tray-content-selection .wv-box-control {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.wv-tray-content-selection .wv-edit-props-card {
+  padding: 10px !important;
+}
+
+/* Text selection in editable tray fields — must target inputs directly (WebKit). */
+.wv-edit-tray input,
+.wv-edit-tray textarea {
+  color-scheme: dark;
+}
+
+.wv-edit-tray input::selection,
+.wv-edit-tray input:focus::selection,
+.wv-edit-tray textarea::selection,
+.wv-edit-tray textarea:focus::selection,
+.wv-number-input::selection,
+.wv-number-input:focus::selection,
+.wv-number-input--card::selection,
+.wv-number-input--card:focus::selection,
+.wv-opacity-card-value-input::selection,
+.wv-opacity-card-value-input:focus::selection,
+.wv-color-card-hex::selection,
+.wv-color-card-hex:focus::selection,
+.wv-color-card-alpha::selection,
+.wv-color-card-alpha:focus::selection,
+.wv-weight-custom-input::selection,
+.wv-weight-custom-input:focus::selection,
+.wv-weight-custom-input--card::selection,
+.wv-weight-custom-input--card:focus::selection {
+  background-color: #777778 !important;
+  color: #ebebeb !important;
+}
+
+.wv-edit-tray input::-moz-selection,
+.wv-edit-tray input:focus::-moz-selection,
+.wv-edit-tray textarea::-moz-selection,
+.wv-edit-tray textarea:focus::-moz-selection,
+.wv-number-input::-moz-selection,
+.wv-number-input:focus::-moz-selection,
+.wv-number-input--card::-moz-selection,
+.wv-number-input--card:focus::-moz-selection,
+.wv-opacity-card-value-input::-moz-selection,
+.wv-opacity-card-value-input:focus::-moz-selection,
+.wv-color-card-hex::-moz-selection,
+.wv-color-card-hex:focus::-moz-selection,
+.wv-color-card-alpha::-moz-selection,
+.wv-color-card-alpha:focus::-moz-selection,
+.wv-weight-custom-input::-moz-selection,
+.wv-weight-custom-input:focus::-moz-selection,
+.wv-weight-custom-input--card::-moz-selection,
+.wv-weight-custom-input--card:focus::-moz-selection {
+  background-color: #777778 !important;
+  color: #ebebeb !important;
+}
 `;

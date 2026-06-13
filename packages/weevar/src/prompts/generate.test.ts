@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ElementIdentity, LayoutChange } from "../engine/layoutTypes";
+import type { ElementIdentity, LayoutChange, StyleTweak } from "../engine/layoutTypes";
 import { generatePrompt } from "./generate";
 
 const el = (overrides: Partial<ElementIdentity>): ElementIdentity => ({
@@ -105,7 +105,7 @@ describe("generatePrompt fixtures", () => {
       layoutType: { display: "flex", flexDirection: "row" },
     };
     const out = generatePrompt(change, { targetTool: "claude-code" });
-    expect(out?.detailed).toContain("# Reorder within <Nav>");
+    expect(out?.detailed).toContain("# Reorder within <div.flex.gap-6.items-center>");
     expect(out?.detailed).toContain("## New child order");
     expect(out?.detailed).toContain("## Constraints");
   });
@@ -205,6 +205,69 @@ describe("generatePrompt edge cases", () => {
     expect(out?.detailed).toContain('<NavItem "Dashboard">');
   });
 
+  it("uses tag+class and child count for container moves (not descendant text)", () => {
+    const change: LayoutChange = {
+      kind: "move",
+      target: el({
+        componentName: "App",
+        tag: "div",
+        classList: ["carousel-scroll"],
+        childElementCount: 4,
+        textSnippet: "Venice, worn varnish.Wool, har",
+        contentHash: "-946342386",
+        source: { file: "src/App.tsx", line: 210, col: 0 },
+        domPath: [
+          { tag: "div", index: 0 },
+          { tag: "main", index: 1 },
+          { tag: "section", index: 2 },
+          { tag: "div", index: 1 },
+          { tag: "div", index: 0 },
+        ],
+      }),
+      fromParent: el({
+        componentName: "App",
+        tag: "div",
+        classList: ["section-widget", "carousel-widget"],
+        source: { file: "src/App.tsx", line: 207, col: 0 },
+      }),
+      toParent: el({
+        componentName: "App",
+        tag: "header",
+        classList: ["article-hero"],
+        source: { file: "src/App.tsx", line: 156, col: 0 },
+      }),
+      fromIndex: 0,
+      toIndex: 1,
+      destinationSiblings: [
+        el({
+          componentName: "App",
+          tag: "h1",
+          classList: ["display-title"],
+          textSnippet: "Meridian",
+        }),
+        el({
+          componentName: "App",
+          tag: "div",
+          classList: ["carousel-scroll"],
+          childElementCount: 4,
+          source: { file: "src/App.tsx", line: 210, col: 0 },
+        }),
+      ],
+      fromLayoutType: { display: "flex", flexDirection: "column" },
+      toLayoutType: { display: "block" },
+    };
+
+    const out = generatePrompt(change, { targetTool: "claude-code" });
+    expect(out?.short).toContain("<div.carousel-scroll> (4 element children)");
+    expect(out?.short).not.toContain("Venice, worn varnish");
+    expect(out?.short).toContain("<div.section-widget.carousel-widget>");
+    expect(out?.short).toContain("<header.article-hero>");
+    expect(out?.short).toContain("Move the entire element subtree");
+    expect(out?.short).toContain("child index 0");
+    expect(out?.detailed).toContain("**Subtree:**");
+    expect(out?.detailed).toContain("do not extract, split, or recreate children");
+  });
+
   it("returns null for same-position reorder", () => {
     const change: LayoutChange = {
       kind: "reorder",
@@ -218,9 +281,10 @@ describe("generatePrompt edge cases", () => {
     expect(generatePrompt(change, { targetTool: "claude-code" })).toBeNull();
   });
 
-  it("still includes component names in strict refs", () => {
+  it("still prefers tag+class over component name when classes exist", () => {
     const button = el({
       componentName: "Button",
+      tag: "button",
       classList: ["primary", "lg"],
     });
     const change: LayoutChange = {
@@ -233,7 +297,7 @@ describe("generatePrompt edge cases", () => {
       layoutType: { display: "flex", flexDirection: "row" },
     };
     const out = generatePrompt(change, { targetTool: "claude-code" });
-    expect(out?.short).toContain("<Button>");
+    expect(out?.short).toContain("<button.primary.lg>");
   });
 
   it("includes non-lossy source and dom anchors in short refs", () => {
@@ -293,5 +357,187 @@ describe("tool variants", () => {
     const generic = generatePrompt(change, { targetTool: "generic" })!;
     expect(claude.detailed).not.toBe(codex.detailed);
     expect(generic.detailed).toContain("## Current code");
+  });
+});
+
+describe("StyleTweak prompts", () => {
+  const baseTweak: StyleTweak = {
+    kind: "style-tweak",
+    target: {
+      tag: "p",
+      classList: ["text-sm", "font-normal"],
+      contentHash: "abc123",
+      label: "<Para>",
+      domPath: [],
+      componentName: "Para",
+    },
+    elementCategory: "text",
+    changes: [
+      {
+        cssProperty: "font-size",
+        displayLabel: "Font Size",
+        fromValue: "14px",
+        toValue: "18px",
+      },
+    ],
+  };
+
+  it("returns null for an empty changes array", () => {
+    const empty: StyleTweak = { ...baseTweak, changes: [] };
+    expect(generatePrompt(empty, { targetTool: "claude-code" })).toBeNull();
+  });
+
+  it("short prompt includes tag+class when classes are present", () => {
+    const withClasses: StyleTweak = {
+      ...baseTweak,
+      target: {
+        ...baseTweak.target,
+        tag: "figure",
+        classList: ["gallery-cell"],
+        componentName: "App",
+        source: { file: "src/App.tsx", line: 182, col: 0 },
+      },
+    };
+    const p = generatePrompt(withClasses, { targetTool: "claude-code" });
+    expect(p!.short).toContain("<figure.gallery-cell>");
+    expect(p!.short).not.toContain("<App>");
+  });
+
+  it("short prompt prefers tag+class when classes are present", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p).not.toBeNull();
+    expect(p!.short).toContain("<p.text-sm.font-normal>");
+  });
+
+  it("short prompt includes before and after values with arrow", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.short).toContain("14px");
+    expect(p!.short).toContain("18px");
+    expect(p!.short).toContain("→");
+  });
+
+  it("short prompt includes the preserve instruction", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.short).toContain("Preserve all props");
+  });
+
+  it("short and detailed prompts surface effective border when borderSummary is set", () => {
+    const tweak: StyleTweak = {
+      ...baseTweak,
+      borderSummary: "type solid, weight 1px, colour #112233",
+      changes: [
+        {
+          cssProperty: "border-style",
+          displayLabel: "Border Style",
+          fromValue: "none",
+          toValue: "solid",
+        },
+      ],
+    };
+    const p = generatePrompt(tweak, { targetTool: "claude-code" });
+    expect(p!.short).toContain("Effective border:");
+    expect(p!.short).toContain("type solid");
+    expect(p!.detailed).toContain("**Effective border:**");
+    expect(p!.detailed).toContain("colour #112233");
+  });
+
+  it("detailed prompt includes a table with before and after columns", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("| Font Size |");
+    expect(p!.detailed).toContain("`14px`");
+    expect(p!.detailed).toContain("`18px`");
+  });
+
+  it("detailed prompt does NOT include Tailwind column when disabled", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).not.toContain("Tailwind suggestion");
+  });
+
+  it("detailed prompt includes Tailwind column when enabled", () => {
+    const p = generatePrompt(baseTweak, {
+      targetTool: "claude-code",
+      config: { prompts: { tailwindVerbatimClasses: true } },
+    });
+    expect(p!.detailed).toContain("Tailwind suggestion");
+    expect(p!.detailed).toContain("text-sm");
+    expect(p!.detailed).toContain("text-lg");
+  });
+
+  it("detailed prompt includes the Constraints section", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("## Constraints");
+    expect(p!.detailed).toContain("Preserve all existing props");
+  });
+
+  it("detailed prompt includes the element tag", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("<p");
+  });
+
+  it("short prompt includes source file path when source is available", () => {
+    const withSource: StyleTweak = {
+      ...baseTweak,
+      target: {
+        ...baseTweak.target,
+        source: { file: "src/components/Para.tsx", line: 12, col: 4 },
+      },
+    };
+    const p = generatePrompt(withSource, { targetTool: "claude-code" });
+    expect(p!.short).toContain("src/components/Para.tsx");
+    expect(p!.short).toContain("12");
+  });
+
+  it("handles multiple property changes in one tweak", () => {
+    const multi: StyleTweak = {
+      ...baseTweak,
+      changes: [
+        {
+          cssProperty: "font-size",
+          displayLabel: "Font Size",
+          fromValue: "14px",
+          toValue: "18px",
+        },
+        {
+          cssProperty: "font-weight",
+          displayLabel: "Font Weight",
+          fromValue: "400",
+          toValue: "600",
+        },
+      ],
+    };
+    const p = generatePrompt(multi, { targetTool: "claude-code" });
+    expect(p!.detailed).toContain("font-size");
+    expect(p!.detailed).toContain("font-weight");
+  });
+
+  it("Tailwind suggestions map font-weight 400→600 correctly", () => {
+    const multi: StyleTweak = {
+      ...baseTweak,
+      changes: [
+        {
+          cssProperty: "font-weight",
+          displayLabel: "Font Weight",
+          fromValue: "400",
+          toValue: "600",
+        },
+      ],
+    };
+    const p = generatePrompt(multi, {
+      targetTool: "claude-code",
+      config: { prompts: { tailwindVerbatimClasses: true } },
+    });
+    expect(p!.detailed).toContain("font-normal");
+    expect(p!.detailed).toContain("font-semibold");
+  });
+
+  it("meta block contains the correct change kind and targetTool", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
+    expect(p!.meta.change.kind).toBe("style-tweak");
+    expect(p!.meta.targetTool).toBe("claude-code");
+  });
+
+  it("cursor targetTool is aliased to codex", () => {
+    const p = generatePrompt(baseTweak, { targetTool: "cursor" });
+    expect(p!.meta.targetTool).toBe("codex");
   });
 });
