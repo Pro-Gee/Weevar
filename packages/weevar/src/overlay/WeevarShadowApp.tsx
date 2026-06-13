@@ -1986,7 +1986,7 @@ body *:focus {
                 >
                   <PromptPanel
                     hidden={!showPromptTray}
-                    promptText={panel ? promptBody(panel.prompt, panel.len) : "No element moved yet"}
+                    promptText={panel ? promptBody(panel.prompt, panel.len) : "No edits made yet"}
                     canCopy={!!panel}
                     runtimeConfig={config}
                     onClose={dismissAllTrays}
