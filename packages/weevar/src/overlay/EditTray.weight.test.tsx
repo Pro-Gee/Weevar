@@ -20,7 +20,7 @@ describe("EditTray font-weight", () => {
     document.body.innerHTML = "";
   });
 
-  it("applies native select preset 700 and notifies parent with edited target", async () => {
+  it("applies preset 700 from tray dropdown and notifies parent with edited target", async () => {
     const p = document.createElement("p");
     p.textContent = "hello";
     document.body.appendChild(p);
@@ -40,12 +40,22 @@ describe("EditTray font-weight", () => {
       );
     });
 
-    const sel = host.querySelector(".wv-weight-native") as HTMLSelectElement | null;
-    expect(sel).toBeTruthy();
+    const trigger = host.querySelector(
+      ".wv-tray-dropdown-chevron-trigger",
+    ) as HTMLButtonElement | null;
+    expect(trigger).toBeTruthy();
 
-    await act(() => {
-      sel!.value = "700";
-      sel!.dispatchEvent(new Event("change", { bubbles: true }));
+    await act(async () => {
+      trigger!.click();
+    });
+
+    const option700 = Array.from(
+      host.querySelectorAll(".wv-tray-dropdown-option"),
+    ).find((el) => el.textContent === "700") as HTMLButtonElement | undefined;
+    expect(option700).toBeTruthy();
+
+    await act(async () => {
+      option700!.click();
     });
 
     expect(p.style.getPropertyValue("font-weight").trim()).toBe("700");

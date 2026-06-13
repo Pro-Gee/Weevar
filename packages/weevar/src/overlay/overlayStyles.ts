@@ -530,6 +530,7 @@ export const OVERLAY_CSS = `
   height: 340px;
   z-index: 25;
   pointer-events: auto;
+  overflow: visible;
 }
 .wv-tray-stack.wv-tray-stack--edit {
   height: 800px;
@@ -2301,6 +2302,200 @@ export const OVERLAY_CSS = `
 .wv-card-select {
   position: relative;
   cursor: pointer;
+}
+
+/* ─── Tray dropdown (selection tray) ─────────────────────────────────── */
+
+.wv-tray-dropdown {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-tray-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+  font: inherit;
+  color: #c7c7c7;
+}
+
+.wv-tray-dropdown-trigger--border {
+  color: #c7c7c7;
+  gap: 8px;
+}
+
+.wv-tray-dropdown-value--border {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.wv-tray-dropdown-trailing--end {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.wv-tray-dropdown-trigger:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.wv-tray-dropdown-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.wv-tray-dropdown-value {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wv-tray-dropdown-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #58585d;
+  transition: transform 0.15s ease;
+}
+
+.wv-tray-dropdown-chevron .wv-typo-chevron {
+  display: block;
+}
+
+.wv-tray-dropdown-chevron--open {
+  transform: rotate(180deg);
+}
+
+.wv-tray-dropdown-chevron-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+}
+
+.wv-tray-dropdown-chevron-trigger:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.wv-tray-dropdown-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(235, 235, 235, 0.04);
+  background: #18181a;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.wv-tray-dropdown-menu--overlay {
+  position: absolute;
+  z-index: 50;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+}
+
+.wv-tray-dropdown .wv-tray-dropdown-menu--overlay {
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  width: auto;
+}
+
+.wv-tray-dropdown-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #c7c7c7;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.wv-tray-dropdown-option:hover {
+  background: rgba(235, 235, 235, 0.02);
+  color: #ebebeb;
+}
+
+.wv-tray-dropdown-option--active {
+  background: rgba(235, 235, 235, 0.08);
+  color: #ebebeb;
+}
+
+.wv-tray-dropdown-option--active:hover {
+  background: rgba(235, 235, 235, 0.05);
+}
+
+.wv-dimension-dropdown .wv-dimension-row {
+  width: 100%;
+}
+
+.wv-dimension-label-trigger {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wv-dimension-label-trigger .wv-typo-card-label {
+  pointer-events: none;
+}
+
+.wv-weight-wrap--card.wv-tray-dropdown > .wv-typo-card {
+  width: 100%;
 }
 
 .wv-card-select-trailing {

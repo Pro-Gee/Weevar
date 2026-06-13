@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
-import { TypoChevronIcon } from "./typographyIcons";
+import {
+  TrayDropdownChevronTrigger,
+  TrayDropdownMenu,
+  type TrayDropdownOption,
+  useTrayDropdown,
+} from "./TrayDropdown";
 
 const PRESET_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 
@@ -12,15 +17,9 @@ type WeightSelectProps = {
   onCancel?: () => void;
   /** Card row styling for typography fields (Figma tray). */
   variant?: "default" | "card";
+  cardLabel?: string;
 };
 
-/**
- * Preset weights use a native `<select>` so the OS draws the menu. A custom in-shadow
- * popover + `document` capture was unreliable: Weevar’s global `pointerdown` capture
- * calls `stopPropagation()` when it thinks the hit is "host page", and closed shadow
- * hit-testing / `composedPath` can mis-classify tray UI — native `<select>` menus are
- * not subject to that path. Custom values still use the text field + the same commit path.
- */
 export function WeightSelect({
   value,
   onChange,
@@ -28,10 +27,12 @@ export function WeightSelect({
   onFocus,
   onCancel,
   variant = "default",
+  cardLabel,
 }: WeightSelectProps) {
   const [customRaw, setCustomRaw] = useState("");
   const [customFocused, setCustomFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { open, toggle, close, rootRef, menuRef } = useTrayDropdown(onFocus);
 
   const inPreset = PRESET_WEIGHTS.includes(value);
 
@@ -53,27 +54,23 @@ export function WeightSelect({
     }
   };
 
-  const handleSelectChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const n = parseInt(e.target.value, 10);
-    if (!Number.isFinite(n)) return;
-    if (n === value) return;
+  const presetOptions: TrayDropdownOption[] = [
+    ...(!inPreset ? [{ value: String(value), label: String(value) }] : []),
+    ...PRESET_WEIGHTS.map((weight) => ({
+      value: String(weight),
+      label: String(weight),
+    })),
+  ];
+
+  const handlePresetSelect = (next: string) => {
+    const n = parseInt(next, 10);
+    if (!Number.isFinite(n) || n === value) return;
     onFocus?.();
     onChange(n);
     onCommit(n);
     if (PRESET_WEIGHTS.includes(n)) setCustomRaw("");
     setCustomFocused(false);
   };
-
-  const presetOptions = (
-    <>
-      {!inPreset && <option value={String(value)}>{String(value)}</option>}
-      {PRESET_WEIGHTS.map((w) => (
-        <option key={w} value={String(w)}>
-          {w}
-        </option>
-      ))}
-    </>
-  );
 
   const customInputHandlers = {
     onFocus: () => {
@@ -117,30 +114,40 @@ export function WeightSelect({
 
   if (variant === "card") {
     return (
-      <div className="wv-weight-wrap wv-pe wv-weight-wrap--card">
-        <div className="wv-weight-row">
-          <input
-            ref={inputRef}
-            type="text"
-            inputMode="numeric"
-            className="wv-weight-custom-input wv-weight-custom-input--card wv-pe"
-            value={displayValue}
-            aria-label="Font weight"
-            {...customInputHandlers}
-          />
-          <label className="wv-weight-card-chevron wv-pe">
-            <select
-              className="wv-weight-native wv-weight-native--card-menu wv-pe"
-              aria-label="Font weight presets"
-              value={String(value)}
-              onPointerDown={() => onFocus?.()}
-              onChange={handleSelectChange}
-            >
-              {presetOptions}
-            </select>
-            <TypoChevronIcon />
-          </label>
+      <div ref={rootRef} className="wv-tray-dropdown wv-weight-wrap--card wv-pe">
+        <div className="wv-typo-card">
+          {cardLabel ? (
+            <span className="wv-typo-card-label">{cardLabel}</span>
+          ) : null}
+          <div className="wv-weight-row">
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              className="wv-weight-custom-input wv-weight-custom-input--card wv-pe"
+              value={displayValue}
+              aria-label="Font weight"
+              {...customInputHandlers}
+            />
+            <TrayDropdownChevronTrigger
+              open={open}
+              onClick={toggle}
+              ariaLabel="Font weight presets"
+            />
+          </div>
         </div>
+        {open ? (
+          <TrayDropdownMenu
+            menuRef={menuRef}
+            value={String(value)}
+            options={presetOptions}
+            onSelect={(next) => {
+              handlePresetSelect(next);
+              close();
+            }}
+            ariaLabel="Font weight presets"
+          />
+        ) : null}
       </div>
     );
   }
@@ -153,9 +160,14 @@ export function WeightSelect({
           aria-label="Font weight"
           value={String(value)}
           onPointerDown={() => onFocus?.()}
-          onChange={handleSelectChange}
+          onChange={(e) => handlePresetSelect(e.target.value)}
         >
-          {presetOptions}
+          {!inPreset && <option value={String(value)}>{String(value)}</option>}
+          {PRESET_WEIGHTS.map((weight) => (
+            <option key={weight} value={String(weight)}>
+              {weight}
+            </option>
+          ))}
         </select>
         <input
           ref={inputRef}

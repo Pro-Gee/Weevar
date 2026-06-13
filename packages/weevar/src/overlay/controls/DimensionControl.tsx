@@ -3,8 +3,13 @@ import type { DimensionSizingMode } from "../../engine/dimensionSizing";
 import { dimensionSizingLabel } from "../../engine/dimensionSizing";
 import { roundTo2 } from "../../engine/roundNumber";
 import { AspectRatioLockIcon } from "./boxSpacingIcons";
-import { DimensionLabelSelect } from "./DimensionLabelSelect";
 import { NumberInput } from "./NumberInput";
+import { TrayDropdownMenu, useDismissOnOutsidePointerDown, stopTrayDropdownTriggerPointerDown } from "./TrayDropdown";
+
+const SIZING_OPTIONS = [
+  { value: "fill", label: "Fill container" },
+  { value: "hug", label: "Hug content" },
+] as const;
 
 type DimensionProp = "width" | "height";
 
@@ -61,7 +66,14 @@ export function DimensionControl({
   const [focusAfterRestore, setFocusAfterRestore] = useState<DimensionProp | null>(
     null,
   );
+  const [sizingMenu, setSizingMenu] = useState<DimensionProp | null>(null);
+  const sizingRootRef = useRef<HTMLDivElement>(null);
+  const sizingMenuRef = useRef<HTMLDivElement>(null);
   const aspectRatioRef = useRef(width / height || 1);
+
+  useDismissOnOutsidePointerDown(!!sizingMenu, sizingRootRef, () => {
+    setSizingMenu(null);
+  }, sizingMenuRef);
 
   const syncAspectRatio = useCallback(() => {
     aspectRatioRef.current = height > 0 ? width / height : 1;
@@ -113,17 +125,27 @@ export function DimensionControl({
     }
   };
 
+  const toggleSizingMenu = (prop: DimensionProp) => {
+    onDimensionFocus(prop);
+    setSizingMenu((current) => (current === prop ? null : prop));
+  };
+
   const renderLabel = (prop: DimensionProp, label: "W" | "H", displayLabel: string) => {
     if (!sizingModes) {
       return <span className="wv-typo-card-label">{label}</span>;
     }
     return (
-      <DimensionLabelSelect
-        label={label}
-        ariaLabel={`${displayLabel} sizing`}
-        onFocus={() => onDimensionFocus(prop)}
-        onSelect={(mode) => onDimensionModeCommit?.(prop, mode)}
-      />
+      <button
+        type="button"
+        className="wv-dimension-label-trigger wv-pe"
+        aria-label={`${displayLabel} sizing`}
+        aria-expanded={sizingMenu === prop}
+        aria-haspopup="listbox"
+        onPointerDown={stopTrayDropdownTriggerPointerDown}
+        onClick={() => toggleSizingMenu(prop)}
+      >
+        <span className="wv-typo-card-label">{label}</span>
+      </button>
     );
   };
 
@@ -170,29 +192,68 @@ export function DimensionControl({
     );
   };
 
+  const sizingMenuValue =
+    sizingMenu === "width"
+      ? widthMode === "fixed"
+        ? ""
+        : widthMode
+      : sizingMenu === "height"
+        ? heightMode === "fixed"
+          ? ""
+          : heightMode
+        : "";
+
+  const sizingMenuLabel =
+    sizingMenu === "width"
+      ? widthDisplayLabel
+      : sizingMenu === "height"
+        ? heightDisplayLabel
+        : "";
+
   return (
-    <div className="wv-dimension-row">
-      <div className="wv-typo-card">
-        {renderLabel("width", "W", widthDisplayLabel)}
-        {renderValue("width", widthMode, width, widthDisplayLabel)}
+    <div
+      ref={sizingRootRef}
+      className={`wv-tray-dropdown wv-dimension-dropdown wv-pe${
+        sizingMenu ? " wv-dimension-dropdown--open" : ""
+      }`}
+    >
+      <div className="wv-dimension-row">
+        <div className="wv-typo-card">
+          {renderLabel("width", "W", widthDisplayLabel)}
+          {renderValue("width", widthMode, width, widthDisplayLabel)}
+        </div>
+        <div className="wv-typo-card">
+          {renderLabel("height", "H", heightDisplayLabel)}
+          {renderValue("height", heightMode, height, heightDisplayLabel)}
+        </div>
+        <button
+          type="button"
+          className={`wv-box-spacing-toggle wv-pe${aspectLocked ? " wv-box-spacing-toggle--active" : ""}`}
+          title={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+          aria-label={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+          aria-pressed={aspectLocked}
+          onClick={() => {
+            syncAspectRatio();
+            setAspectLocked((locked) => !locked);
+          }}
+        >
+          <AspectRatioLockIcon />
+        </button>
       </div>
-      <div className="wv-typo-card">
-        {renderLabel("height", "H", heightDisplayLabel)}
-        {renderValue("height", heightMode, height, heightDisplayLabel)}
-      </div>
-      <button
-        type="button"
-        className={`wv-box-spacing-toggle wv-pe${aspectLocked ? " wv-box-spacing-toggle--active" : ""}`}
-        title={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
-        aria-label={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
-        aria-pressed={aspectLocked}
-        onClick={() => {
-          syncAspectRatio();
-          setAspectLocked((locked) => !locked);
-        }}
-      >
-        <AspectRatioLockIcon />
-      </button>
+      {sizingMenu ? (
+        <TrayDropdownMenu
+          menuRef={sizingMenuRef}
+          value={sizingMenuValue}
+          options={SIZING_OPTIONS}
+          ariaLabel={`${sizingMenuLabel} sizing`}
+          onSelect={(mode) => {
+            if (mode === "fill" || mode === "hug") {
+              onDimensionModeCommit?.(sizingMenu, mode);
+            }
+            setSizingMenu(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

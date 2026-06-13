@@ -849,17 +849,15 @@ export function EditTray({
                   onCancel={() => revertDeferrablePreview("font-size")}
                 />
               </div>
-              <div className="wv-typo-card">
-                <span className="wv-typo-card-label">Font Weight</span>
-                <WeightSelect
-                  variant="card"
-                  value={fontWeight}
-                  onChange={(v) => handleChange("font-weight", String(v))}
-                  onCommit={(v) => handleCommit("font-weight", "Font Weight", String(v))}
-                  onFocus={() => handleFocus("font-weight")}
-                  onCancel={() => revertDeferrablePreview("font-weight")}
-                />
-              </div>
+              <WeightSelect
+                variant="card"
+                cardLabel="Font Weight"
+                value={fontWeight}
+                onChange={(v) => handleChange("font-weight", String(v))}
+                onCommit={(v) => handleCommit("font-weight", "Font Weight", String(v))}
+                onFocus={() => handleFocus("font-weight")}
+                onCancel={() => revertDeferrablePreview("font-weight")}
+              />
               <SegmentedControl
                 variant="card"
                 value={textAlign}

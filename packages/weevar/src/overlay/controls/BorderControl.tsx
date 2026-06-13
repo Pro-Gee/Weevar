@@ -1,8 +1,8 @@
-import { useState, type ChangeEvent } from "react";
+import { useState } from "react";
 import { ColorPicker } from "./ColorPicker";
 import { NumberInput } from "./NumberInput";
 import { BorderTypeIcon, BoxSidesToggleIcon } from "./boxSpacingIcons";
-import { TypoChevronIcon } from "./typographyIcons";
+import { TrayDropdown } from "./TrayDropdown";
 
 const BORDER_STYLE_OPTIONS = [
   { value: "none", label: "None" },
@@ -85,11 +85,7 @@ export function BorderControl({
     (widths.top + widths.right + widths.bottom + widths.left) / 4,
   );
 
-  const styleLabel =
-    BORDER_STYLE_OPTIONS.find((o) => o.value === style)?.label ?? style;
-
-  const handleStyleSelect = (e: ChangeEvent<HTMLSelectElement>) => {
-    const next = e.target.value;
+  const handleStyleSelect = (next: string) => {
     onFocusStyle?.();
     onStyleChange(next);
     onStyleCommit(next);
@@ -163,24 +159,14 @@ export function BorderControl({
     <div className="wv-box-subsection wv-border-section">
       <span className="wv-box-subsection-title">Box Border</span>
 
-      <label className="wv-border-style-card wv-pe">
-        <BorderTypeIcon />
-        <span className="wv-border-style-value">{styleLabel}</span>
-        <TypoChevronIcon />
-        <select
-          className="wv-border-style-native wv-pe"
-          aria-label="Border style"
-          value={style}
-          onPointerDown={() => onFocusStyle?.()}
-          onChange={handleStyleSelect}
-        >
-          {BORDER_STYLE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <TrayDropdown
+        value={style}
+        options={BORDER_STYLE_OPTIONS}
+        leadingIcon={<BorderTypeIcon />}
+        ariaLabel="Border style"
+        onOpen={onFocusStyle}
+        onSelect={handleStyleSelect}
+      />
 
       <ColorPicker
         variant="card"
