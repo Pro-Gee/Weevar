@@ -1,28 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   areStyleCommitValuesEquivalent,
+  applySvgDimension,
   classifyElement,
   elementTypeLabel,
   normalizeFontWeightValue,
   readBorderValues,
+  readBorderWidthValues,
   readBoxValues,
   readLineHeightAsPixelNumber,
   readPropertyValue,
   readRadiusValues,
   readCssColorForPicker,
+  readSvgDimension,
+  readSvgDimensionRaw,
+  resolveSvgRoot,
   rgbToHex,
   supportsCssBackgroundColor,
 } from "../engine/styleEngine";
+import { roundTo2 } from "../engine/roundNumber";
 import type { ElementCategory } from "../engine/layoutTypes";
 import { AlignmentControl } from "./controls/AlignmentControl";
 import { BorderControl } from "./controls/BorderControl";
 import { BoxControl } from "./controls/BoxControl";
+import { CardSelectControl } from "./controls/CardSelectControl";
 import { ColorPicker } from "./controls/ColorPicker";
+import { DimensionControl } from "./controls/DimensionControl";
 import { NumberInput } from "./controls/NumberInput";
 import { OpacityControl } from "./controls/OpacityControl";
 import { RadiusControl } from "./controls/RadiusControl";
+import { LayoutTypeControl, type LayoutType } from "./controls/LayoutTypeControl";
+import { LayoutGapControl } from "./controls/LayoutGapControl";
+import { LayoutColumnsControl } from "./controls/LayoutColumnsControl";
 import { SegmentedControl } from "./controls/SegmentedControl";
-import { SelectControl } from "./controls/SelectControl";
 import { WeightSelect } from "./controls/WeightSelect";
 import { TypoLetterSpacingIcon, TypoLineHeightIcon, SectionCollapseIcon, SectionExpandIcon, SectionDivider } from "./controls/typographyIcons";
 
@@ -135,6 +145,8 @@ export function EditTray({
   const [category, setCategory] = useState<ElementCategory>("generic");
   const [cssOpen, setCssOpen] = useState(false);
   const [boxSectionOpen, setBoxSectionOpen] = useState(true);
+  const [layoutSectionOpen, setLayoutSectionOpen] = useState(true);
+  const [visibilitySectionOpen, setVisibilitySectionOpen] = useState(true);
   const [, setTick] = useState(0);
   const fromValuesRef = useRef<Map<string, string>>(new Map());
 
@@ -143,6 +155,8 @@ export function EditTray({
     setCategory(classifyElement(element));
     setCssOpen(false);
     setBoxSectionOpen(true);
+    setLayoutSectionOpen(true);
+    setVisibilitySectionOpen(true);
 
     // Pre-record ALL property baselines using getComputedStyle (not inline style)
     // so fromValue is always available even if onFocus doesn't fire before handleChange.
@@ -163,7 +177,8 @@ export function EditTray({
       "align-items",
       "margin-top", "margin-right", "margin-bottom", "margin-left",
       "padding-top", "padding-right", "padding-bottom", "padding-left",
-      "border-width", "border-style", "border-color",
+      "border-width", "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+      "border-style", "border-color",
       "border-radius",
       "border-top-left-radius", "border-top-right-radius",
       "border-bottom-right-radius", "border-bottom-left-radius",
@@ -172,6 +187,15 @@ export function EditTray({
     for (const prop of BASELINE_PROPS) {
       const val = cs.getPropertyValue(prop).trim();
       if (val) baseline.set(prop, val);
+    }
+    if (classifyElement(element) === "svg") {
+      const root = resolveSvgRoot(element);
+      if (root) {
+        const w = readSvgDimensionRaw(element, "width");
+        const h = readSvgDimensionRaw(element, "height");
+        if (w) baseline.set("svg-width", w);
+        if (h) baseline.set("svg-height", h);
+      }
     }
     fromValuesRef.current = baseline;
 
@@ -250,6 +274,59 @@ export function EditTray({
     const map = { tl: "top-left", tr: "top-right", br: "bottom-right", bl: "bottom-left" } as const;
     return `border-${map[corner]}-radius`;
   }, []);
+
+  const svgDimSnapshotKey = (prop: "width" | "height") => `svg-${prop}`;
+
+  const handleSvgDimensionFocus = useCallback(
+    (prop: "width" | "height") => {
+      fromValuesRef.current.set(svgDimSnapshotKey(prop), readSvgDimensionRaw(element, prop));
+    },
+    [element],
+  );
+
+  const revertSvgDimensionPreview = useCallback(
+    (prop: "width" | "height") => {
+      const raw = (
+        fromValuesRef.current.get(svgDimSnapshotKey(prop)) ?? readSvgDimensionRaw(element, prop)
+      ).trim();
+      applySvgDimension(element, prop, raw);
+      setTick((n) => n + 1);
+    },
+    [element],
+  );
+
+  const handleSvgDimensionChange = useCallback(
+    (prop: "width" | "height", value: string) => {
+      applySvgDimension(element, prop, value);
+      setTick((n) => n + 1);
+    },
+    [element],
+  );
+
+  const handleSvgDimensionCommit = useCallback(
+    (prop: "width" | "height", displayLabel: string, value: string) => {
+      const root = resolveSvgRoot(element);
+      if (!root) return;
+
+      const snapKey = svgDimSnapshotKey(prop);
+      const trimmed = value.trim();
+      const pxVal = /px$/i.test(trimmed) ? trimmed : `${trimmed}px`;
+      const rawFrom = (fromValuesRef.current.get(snapKey) ?? readSvgDimensionRaw(element, prop)).trim();
+
+      if (areStyleCommitValuesEquivalent(prop, rawFrom, pxVal)) {
+        applySvgDimension(element, prop, pxVal);
+        fromValuesRef.current.set(snapKey, pxVal);
+        setTick((n) => n + 1);
+        return;
+      }
+
+      applySvgDimension(element, prop, pxVal);
+      onStyleCommit(root, prop, displayLabel, rawFrom, pxVal);
+      fromValuesRef.current.set(snapKey, pxVal);
+      setTick((n) => n + 1);
+    },
+    [element, onStyleCommit],
+  );
 
   // Collapsing the tray / hiding it should blur focused inputs so the final value commits once.
   useEffect(() => {
@@ -372,6 +449,72 @@ export function EditTray({
     [handleChange],
   );
 
+  const handleBorderWidthCommit = useCallback(
+    (
+      axis: "all" | "top" | "right" | "bottom" | "left",
+      value: number,
+    ) => {
+      const val = `${value}px`;
+      const sides: Array<[string, string]> =
+        axis === "all"
+          ? [
+              ["border-top-width", val],
+              ["border-right-width", val],
+              ["border-bottom-width", val],
+              ["border-left-width", val],
+            ]
+          : [[`border-${axis}-width`, val]];
+      for (const [cssProperty, cssValue] of sides) {
+        const displayLabel =
+          axis === "all"
+            ? "Border Weight"
+            : `Border Weight ${axis.charAt(0).toUpperCase()}${axis.slice(1)}`;
+        handleCommit(cssProperty, displayLabel, cssValue);
+      }
+    },
+    [handleCommit],
+  );
+
+  const handleBorderWidthChange = useCallback(
+    (axis: "all" | "top" | "right" | "bottom" | "left", value: number) => {
+      const val = `${value}px`;
+      const sides =
+        axis === "all"
+          ? ["border-top-width", "border-right-width", "border-bottom-width", "border-left-width"]
+          : [`border-${axis}-width`];
+      for (const p of sides) handleChange(p, val);
+    },
+    [handleChange],
+  );
+
+  const snapshotBorderWidth = useCallback(
+    (axis: "all" | "top" | "right" | "bottom" | "left") => {
+      if (axis === "all") {
+        handleDeferrableFocus("border-top-width");
+        handleDeferrableFocus("border-right-width");
+        handleDeferrableFocus("border-bottom-width");
+        handleDeferrableFocus("border-left-width");
+      } else {
+        handleDeferrableFocus(`border-${axis}-width`);
+      }
+    },
+    [handleDeferrableFocus],
+  );
+
+  const revertBorderWidthPreview = useCallback(
+    (axis: "all" | "top" | "right" | "bottom" | "left") => {
+      if (axis === "all") {
+        revertDeferrablePreview("border-top-width");
+        revertDeferrablePreview("border-right-width");
+        revertDeferrablePreview("border-bottom-width");
+        revertDeferrablePreview("border-left-width");
+      } else {
+        revertDeferrablePreview(`border-${axis}-width`);
+      }
+    },
+    [revertDeferrablePreview],
+  );
+
   // ─── Read current values from the element ────────────────────────────
   const cs = getComputedStyle(element);
 
@@ -386,15 +529,23 @@ export function EditTray({
 
   const showBackgroundColour = supportsCssBackgroundColor(category);
 
-  const svgWidth  = parseFloat(readPropertyValue(element, "width"))  || 24;
-  const svgHeight = parseFloat(readPropertyValue(element, "height")) || 24;
+  const readBoxDimension = (prop: "width" | "height"): number => {
+    const parsed = parseFloat(readPropertyValue(element, prop));
+    if (Number.isFinite(parsed) && parsed > 0) return roundTo2(parsed);
+    const computed = parseFloat(cs.getPropertyValue(prop));
+    if (Number.isFinite(computed) && computed > 0) return roundTo2(computed);
+    const rect = element.getBoundingClientRect();
+    const px = prop === "width" ? rect.width : rect.height;
+    return roundTo2(px);
+  };
+
+  const boxWidth = readBoxDimension("width");
+  const boxHeight = readBoxDimension("height");
+
+  const svgWidth = readSvgDimension(element, "width");
+  const svgHeight = readSvgDimension(element, "height");
 
   const imgFit    = readPropertyValue(element, "object-fit") || "fill";
-  const imgWidth  = parseFloat(readPropertyValue(element, "width"))  || 100;
-  const imgHeight = parseFloat(readPropertyValue(element, "height")) || 100;
-
-  const stackWidth    = parseFloat(readPropertyValue(element, "width"))          || 100;
-  const stackHeight   = parseFloat(readPropertyValue(element, "height"))         || 100;
   const gapUnified    = parseFloat(readPropertyValue(element, "gap"))            || 0;
   const isGridLayout  = cs.display.includes("grid");
   const gridTemplateColsRaw = readPropertyValue(element, "grid-template-columns");
@@ -416,8 +567,48 @@ export function EditTray({
   const marginValues  = readBoxValues(element, "margin");
   const paddingValues = readBoxValues(element, "padding");
   const borderVals    = readBorderValues(element);
+  const borderWidths  = readBorderWidthValues(element);
   const radiusVals    = readRadiusValues(element);
-  const opacity       = parseFloat(readPropertyValue(element, "opacity") || "1") || 1;
+  const opacityParsed = parseFloat(readPropertyValue(element, "opacity"));
+  const opacity = Number.isFinite(opacityParsed) ? opacityParsed : 1;
+
+  const layoutType: LayoutType = isGridLayout
+    ? "grid"
+    : flexDir === "column"
+      ? "column"
+      : "row";
+
+  const handleLayoutTypeSelect = useCallback(
+    (type: LayoutType) => {
+      if (type === "grid") {
+        if (isGridLayout) return;
+        const gtc = `repeat(${DEFAULT_GRID_COLUMNS}, minmax(0, 1fr))`;
+        handleFocus("display");
+        handleDeferrableFocus("grid-template-columns");
+        handleChange("display", "grid");
+        handleChange("grid-template-columns", gtc);
+        handleCommit("display", "Display", "grid");
+        handleCommit("grid-template-columns", "Grid columns", gtc);
+        return;
+      }
+      handleFocus("display");
+      handleFocus("flex-direction");
+      clearGridTemplateIfNeeded();
+      const direction = type === "column" ? "column" : "row";
+      handleChange("display", "flex");
+      handleChange("flex-direction", direction);
+      handleCommit("display", "Display", "flex");
+      handleCommit("flex-direction", "Direction", direction);
+    },
+    [
+      isGridLayout,
+      handleFocus,
+      handleDeferrableFocus,
+      handleChange,
+      handleCommit,
+      clearGridTemplateIfNeeded,
+    ],
+  );
 
   // ─── CSS panel: read computed values for the relevant properties ──────
   const cssPanelLines = (CSS_PANEL_PROPS[category] ?? [])
@@ -444,51 +635,66 @@ export function EditTray({
       </div>
       {boxSectionOpen && (
         <div className="wv-box-section-body">
-          <BoxControl
-            property="margin"
-            values={marginValues}
-            onChange={(axis, v) => handleBoxChange("margin", axis, v)}
-            onCommit={(axis, v) => handleBoxCommit("margin", axis, v)}
-            onFocus={(axis) => snapshotBoxAxis("margin", axis)}
-            onDeferCancel={(axis) => revertBoxAxisPreview("margin", axis)}
-          />
-          <BoxControl
-            property="padding"
-            values={paddingValues}
-            onChange={(axis, v) => handleBoxChange("padding", axis, v)}
-            onCommit={(axis, v) => handleBoxCommit("padding", axis, v)}
-            onFocus={(axis) => snapshotBoxAxis("padding", axis)}
-            onDeferCancel={(axis) => revertBoxAxisPreview("padding", axis)}
-          />
-          {showBackgroundColour && (
-            <ColorPicker
-              variant="card"
-              cardLabel="Colour"
-              value={backgroundColor}
-              styleCommitTarget={element}
-              selectionDismissSignal={element}
-              onChange={(v, target) => handleChange("background-color", v, target)}
-              onCommit={(v, target, fromSnap) =>
-                handleCommit("background-color", "Background Colour", v, target, fromSnap)}
-              onFocus={() => handleFocus("background-color")}
+          <div className="wv-box-section-fields">
+            {category !== "image" && category !== "stack" && (
+              <DimensionControl
+                width={boxWidth}
+                height={boxHeight}
+                widthDisplayLabel="Box Width"
+                heightDisplayLabel="Box Height"
+                onDimensionChange={(prop, v) => handleChange(prop, v)}
+                onDimensionCommit={(prop, v) =>
+                  handleCommit(prop, prop === "width" ? "Box Width" : "Box Height", v)}
+                onDimensionFocus={(prop) => handleDeferrableFocus(prop)}
+                onDimensionCancel={(prop) => revertDeferrablePreview(prop)}
+              />
+            )}
+            <BoxControl
+              property="margin"
+              values={marginValues}
+              onChange={(axis, v) => handleBoxChange("margin", axis, v)}
+              onCommit={(axis, v) => handleBoxCommit("margin", axis, v)}
+              onFocus={(axis) => snapshotBoxAxis("margin", axis)}
+              onDeferCancel={(axis) => revertBoxAxisPreview("margin", axis)}
             />
-          )}
-          <div className="wv-edit-section-label">Border</div>
+            <BoxControl
+              property="padding"
+              values={paddingValues}
+              onChange={(axis, v) => handleBoxChange("padding", axis, v)}
+              onCommit={(axis, v) => handleBoxCommit("padding", axis, v)}
+              onFocus={(axis) => snapshotBoxAxis("padding", axis)}
+              onDeferCancel={(axis) => revertBoxAxisPreview("padding", axis)}
+            />
+            {showBackgroundColour && (
+              <ColorPicker
+                variant="card"
+                cardLabel="Colour"
+                value={backgroundColor}
+                styleCommitTarget={element}
+                selectionDismissSignal={element}
+                onChange={(v, target) => handleChange("background-color", v, target)}
+                onCommit={(v, target, fromSnap) =>
+                  handleCommit("background-color", "Background Colour", v, target, fromSnap)}
+                onFocus={() => handleFocus("background-color")}
+              />
+            )}
+          </div>
           <BorderControl
-            width={borderVals.width}
             style={borderVals.style}
             color={borderVals.color}
+            widths={borderWidths}
             styleCommitTarget={element}
             selectionDismissSignal={element}
-            onWidthChange={(v) => handleChange("border-width", v)}
-            onWidthCommit={(v) => handleCommit("border-width", "Border Width", v)}
             onStyleChange={(v) => handleChange("border-style", v)}
             onStyleCommit={(v) => handleCommit("border-style", "Border Style", v)}
             onColorChange={(v, target) => handleChange("border-color", v, target)}
             onColorCommit={(v, target, fromSnap) =>
-              handleCommit("border-color", "Border Color", v, target, fromSnap)}
-            onFocusWidth={() => handleDeferrableFocus("border-width")}
-            onCancelWidth={() => revertDeferrablePreview("border-width")}
+              handleCommit("border-color", "Border Colour", v, target, fromSnap)}
+            onWidthChange={handleBorderWidthChange}
+            onWidthCommit={handleBorderWidthCommit}
+            onFocusStyle={() => handleFocus("border-style")}
+            onFocusWidth={snapshotBorderWidth}
+            onCancelWidth={revertBorderWidthPreview}
             onFocusColor={() => handleFocus("border-color")}
           />
           <RadiusControl
@@ -512,11 +718,33 @@ export function EditTray({
             onFocus={(corner) => handleDeferrableFocus(radiusCornerCss(corner))}
             onDeferCancel={(corner) => revertDeferrablePreview(radiusCornerCss(corner))}
           />
+        </div>
+      )}
+    </div>
+  );
+
+  const VisibilitySection = (
+    <div className="wv-style-section wv-visibility-section">
+      <div className="wv-style-section-head">
+        <span className="wv-style-section-title">Visibility</span>
+        <button
+          type="button"
+          className="wv-style-section-toggle wv-pe"
+          aria-expanded={visibilitySectionOpen}
+          aria-label={visibilitySectionOpen ? "Collapse visibility section" : "Expand visibility section"}
+          onClick={() => setVisibilitySectionOpen((open) => !open)}
+        >
+          {visibilitySectionOpen ? <SectionCollapseIcon /> : <SectionExpandIcon />}
+        </button>
+      </div>
+      {visibilitySectionOpen && (
+        <div className="wv-visibility-section-body">
           <OpacityControl
             value={opacity}
             onChange={(v) => handleChange("opacity", String(v))}
             onCommit={(v) => handleCommit("opacity", "Opacity", String(v))}
             onFocus={() => handleDeferrableFocus("opacity")}
+            onCancel={() => revertDeferrablePreview("opacity")}
           />
         </div>
       )}
@@ -649,313 +877,165 @@ export function EditTray({
                 onFocus={() => handleFocus("color")}
               />
             </div>
-            <SectionDivider />
           </>
         )}
 
         {/* ── SVG ── */}
         {category === "svg" && (
           <>
-            <div className="wv-edit-section-label">SVG</div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Width</span>
-              <NumberInput
-                cssProperty="width"
-                displayLabel="Width"
-                value={svgWidth}
-                unit="px"
-                min={1}
-                onChange={(v) => handleChange("width", v)}
-                onCommit={(v) => handleCommit("width", "Width", v)}
-                onFocus={() => handleDeferrableFocus("width")}
-                onCancel={() => revertDeferrablePreview("width")}
-              />
-            </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Height</span>
-              <NumberInput
-                cssProperty="height"
-                displayLabel="Height"
-                value={svgHeight}
-                unit="px"
-                min={1}
-                onChange={(v) => handleChange("height", v)}
-                onCommit={(v) => handleCommit("height", "Height", v)}
-                onFocus={() => handleDeferrableFocus("height")}
-                onCancel={() => revertDeferrablePreview("height")}
-              />
-            </div>
-            <SectionDivider />
+            <DimensionControl
+              width={svgWidth}
+              height={svgHeight}
+              widthDisplayLabel="SVG Width"
+              heightDisplayLabel="SVG Height"
+              onDimensionChange={handleSvgDimensionChange}
+              onDimensionCommit={(prop, value) =>
+                handleSvgDimensionCommit(
+                  prop,
+                  prop === "width" ? "SVG Width" : "SVG Height",
+                  value,
+                )}
+              onDimensionFocus={handleSvgDimensionFocus}
+              onDimensionCancel={revertSvgDimensionPreview}
+            />
           </>
         )}
 
         {/* ── Image ── */}
         {category === "image" && (
           <>
-            <div className="wv-edit-section-label">Image</div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Fit</span>
-              <SelectControl
+            <div className="wv-typo-stack">
+              <DimensionControl
+                width={boxWidth}
+                height={boxHeight}
+                widthDisplayLabel="Image Width"
+                heightDisplayLabel="Image Height"
+                onDimensionChange={(prop, v) => handleChange(prop, v)}
+                onDimensionCommit={(prop, v) =>
+                  handleCommit(prop, prop === "width" ? "Image Width" : "Image Height", v)}
+                onDimensionFocus={(prop) => handleDeferrableFocus(prop)}
+                onDimensionCancel={(prop) => revertDeferrablePreview(prop)}
+              />
+              <CardSelectControl
+                label="Fit"
                 value={imgFit}
                 options={[
-                  { value: "cover",      label: "Cover" },
-                  { value: "contain",    label: "Contain" },
-                  { value: "fill",       label: "Fill" },
-                  { value: "none",       label: "None" },
+                  { value: "cover", label: "Cover" },
+                  { value: "contain", label: "Contain" },
+                  { value: "fill", label: "Fill" },
+                  { value: "none", label: "None" },
                   { value: "scale-down", label: "Scale Down" },
                 ]}
-                onCommit={(v) => {
-                  handleFocus("object-fit");
-                  handleCommit("object-fit", "Fit", v);
-                }}
+                onFocus={() => handleFocus("object-fit")}
+                onCommit={(v) => handleCommit("object-fit", "Fit", v)}
               />
             </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Width</span>
-              <NumberInput
-                cssProperty="width"
-                displayLabel="Width"
-                value={imgWidth}
-                unit="px"
-                min={1}
-                onChange={(v) => handleChange("width", v)}
-                onCommit={(v) => handleCommit("width", "Width", v)}
-                onFocus={() => handleDeferrableFocus("width")}
-                onCancel={() => revertDeferrablePreview("width")}
-              />
-            </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Height</span>
-              <NumberInput
-                cssProperty="height"
-                displayLabel="Height"
-                value={imgHeight}
-                unit="px"
-                min={1}
-                onChange={(v) => handleChange("height", v)}
-                onCommit={(v) => handleCommit("height", "Height", v)}
-                onFocus={() => handleDeferrableFocus("height")}
-                onCancel={() => revertDeferrablePreview("height")}
-              />
-            </div>
-            <SectionDivider />
           </>
         )}
 
         {/* ── Stack ── */}
         {category === "stack" && (
           <>
-            <div className="wv-edit-section-label">Size</div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Width</span>
-              <NumberInput
-                cssProperty="width"
-                displayLabel="Width"
-                value={stackWidth}
-                unit="px"
-                min={1}
-                onChange={(v) => handleChange("width", v)}
-                onCommit={(v) => handleCommit("width", "Width", v)}
-                onFocus={() => handleDeferrableFocus("width")}
-                onCancel={() => revertDeferrablePreview("width")}
-              />
-            </div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Height</span>
-              <NumberInput
-                cssProperty="height"
-                displayLabel="Height"
-                value={stackHeight}
-                unit="px"
-                min={1}
-                onChange={(v) => handleChange("height", v)}
-                onCommit={(v) => handleCommit("height", "Height", v)}
-                onFocus={() => handleDeferrableFocus("height")}
-                onCancel={() => revertDeferrablePreview("height")}
-              />
-            </div>
-            <SectionDivider />
-            <div className="wv-edit-section-label">Layout</div>
-            <div className="wv-prop-row">
-              <span className="wv-prop-label">Layout</span>
-              <div className="wv-layout-type-toggle wv-pe">
-                {/* Horizontal stack */}
-                <button
-                  type="button"
-                  className={`wv-layout-type-btn wv-pe${
-                    cs.display.includes("flex") && flexDir === "row" ? " wv-layout-type-btn--active" : ""
-                  }`}
-                  title="Horizontal stack (flex row)"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    handleFocus("display");
-                    handleFocus("flex-direction");
-                    clearGridTemplateIfNeeded();
-                    handleChange("display", "flex");
-                    handleChange("flex-direction", "row");
-                    handleCommit("display", "Display", "flex");
-                    handleCommit("flex-direction", "Direction", "row");
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <rect x="1" y="4" width="4" height="8" rx="1" fill="currentColor" opacity="0.9"/>
-                    <rect x="6" y="4" width="4" height="8" rx="1" fill="currentColor" opacity="0.9"/>
-                    <rect x="11" y="4" width="4" height="8" rx="1" fill="currentColor" opacity="0.9"/>
-                  </svg>
-                </button>
-                {/* Vertical stack */}
-                <button
-                  type="button"
-                  className={`wv-layout-type-btn wv-pe${
-                    cs.display.includes("flex") && flexDir === "column" ? " wv-layout-type-btn--active" : ""
-                  }`}
-                  title="Vertical stack (flex column)"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    handleFocus("display");
-                    handleFocus("flex-direction");
-                    clearGridTemplateIfNeeded();
-                    handleChange("display", "flex");
-                    handleChange("flex-direction", "column");
-                    handleCommit("display", "Display", "flex");
-                    handleCommit("flex-direction", "Direction", "column");
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <rect x="4" y="1" width="8" height="4" rx="1" fill="currentColor" opacity="0.9"/>
-                    <rect x="4" y="6" width="8" height="4" rx="1" fill="currentColor" opacity="0.9"/>
-                    <rect x="4" y="11" width="8" height="4" rx="1" fill="currentColor" opacity="0.9"/>
-                  </svg>
-                </button>
-                {/* Grid */}
-                <button
-                  type="button"
-                  className={`wv-layout-type-btn wv-pe${
-                    isGridLayout ? " wv-layout-type-btn--active" : ""
-                  }`}
-                  title="Grid"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    if (isGridLayout) return;
-                    const gtc = `repeat(${DEFAULT_GRID_COLUMNS}, minmax(0, 1fr))`;
-                    handleFocus("display");
-                    handleDeferrableFocus("grid-template-columns");
-                    handleChange("display", "grid");
-                    handleChange("grid-template-columns", gtc);
-                    handleCommit("display", "Display", "grid");
-                    handleCommit("grid-template-columns", "Grid columns", gtc);
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor" opacity="0.9"/>
-                    <rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor" opacity="0.9"/>
-                    <rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor" opacity="0.9"/>
-                    <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" opacity="0.9"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            {isGridLayout && (
-              <div className="wv-prop-row">
-                <span className="wv-prop-label">Columns</span>
-                <NumberInput
-                  cssProperty="grid-template-columns"
-                  displayLabel="Columns"
-                  value={gridColCount}
-                  unit=""
-                  min={1}
-                  max={24}
-                  onChange={(v) => {
-                    const n = parseInt(v, 10);
-                    if (!Number.isFinite(n)) return;
-                    const clamped = Math.max(1, Math.min(24, n));
-                    handleChange(
-                      "grid-template-columns",
-                      `repeat(${clamped}, minmax(0, 1fr))`,
-                    );
-                  }}
-                  onCommit={(v) => {
-                    const n = parseInt(v, 10);
-                    if (!Number.isFinite(n)) return;
-                    const clamped = Math.max(1, Math.min(24, n));
-                    handleCommit(
-                      "grid-template-columns",
-                      "Grid columns",
-                      `repeat(${clamped}, minmax(0, 1fr))`,
-                    );
-                  }}
-                  onFocus={() => handleDeferrableFocus("grid-template-columns")}
-                  onCancel={() => revertDeferrablePreview("grid-template-columns")}
-                />
-              </div>
-            )}
-            {isGridLayout ? (
-              <>
-                <div className="wv-prop-row">
-                  <span className="wv-prop-label">Vertical gap</span>
-                  <NumberInput
-                    cssProperty="row-gap"
-                    displayLabel="Vertical gap"
-                    value={rowGap}
-                    unit="px"
-                    min={0}
-                    onChange={(v) => handleChange("row-gap", v)}
-                    onCommit={(v) => handleCommit("row-gap", "Vertical gap", v)}
-                    onFocus={() => handleDeferrableFocus("row-gap")}
-                    onCancel={() => revertDeferrablePreview("row-gap")}
-                  />
-                </div>
-                <div className="wv-prop-row">
-                  <span className="wv-prop-label">Horizontal gap</span>
-                  <NumberInput
-                    cssProperty="column-gap"
-                    displayLabel="Horizontal gap"
-                    value={colGap}
-                    unit="px"
-                    min={0}
-                    onChange={(v) => handleChange("column-gap", v)}
-                    onCommit={(v) => handleCommit("column-gap", "Horizontal gap", v)}
-                    onFocus={() => handleDeferrableFocus("column-gap")}
-                    onCancel={() => revertDeferrablePreview("column-gap")}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="wv-prop-row">
-                <span className="wv-prop-label">Gap</span>
-                <NumberInput
-                  cssProperty="gap"
-                  displayLabel="Gap"
-                  value={gapUnified}
-                  unit="px"
-                  min={0}
-                  onChange={(v) => handleChange("gap", v)}
-                  onCommit={(v) => handleCommit("gap", "Gap", v)}
-                  onFocus={() => handleDeferrableFocus("gap")}
-                  onCancel={() => revertDeferrablePreview("gap")}
-                />
-              </div>
-            )}
-            <SectionDivider />
-            <div className="wv-edit-section-label">Alignment</div>
-            <AlignmentControl
-              justifyContent={justifyContent}
-              alignItems={alignItems}
-              onJustifyCommit={(v) => {
-                handleFocus("justify-content");
-                handleCommit("justify-content", "Main Axis Alignment", v);
-              }}
-              onAlignCommit={(v) => {
-                handleFocus("align-items");
-                handleCommit("align-items", "Cross Axis Alignment", v);
-              }}
+            <DimensionControl
+              width={boxWidth}
+              height={boxHeight}
+              widthDisplayLabel="Box Width"
+              heightDisplayLabel="Box Height"
+              onDimensionChange={(prop, v) => handleChange(prop, v)}
+              onDimensionCommit={(prop, v) =>
+                handleCommit(prop, prop === "width" ? "Box Width" : "Box Height", v)}
+              onDimensionFocus={(prop) => handleDeferrableFocus(prop)}
+              onDimensionCancel={(prop) => revertDeferrablePreview(prop)}
             />
             <SectionDivider />
+            <div className="wv-style-section wv-layout-section">
+              <div className="wv-style-section-head">
+                <span className="wv-style-section-title">Layout</span>
+                <button
+                  type="button"
+                  className="wv-style-section-toggle wv-pe"
+                  aria-expanded={layoutSectionOpen}
+                  aria-label={layoutSectionOpen ? "Collapse layout section" : "Expand layout section"}
+                  onClick={() => setLayoutSectionOpen((open) => !open)}
+                >
+                  {layoutSectionOpen ? <SectionCollapseIcon /> : <SectionExpandIcon />}
+                </button>
+              </div>
+              {layoutSectionOpen && (
+                <div className="wv-layout-section-body">
+                  <LayoutTypeControl
+                    value={layoutType}
+                    onSelect={handleLayoutTypeSelect}
+                  />
+                  {isGridLayout && (
+                    <LayoutColumnsControl
+                      value={gridColCount}
+                      onChange={(v) => {
+                        const n = parseInt(v, 10);
+                        if (!Number.isFinite(n)) return;
+                        const clamped = Math.max(1, Math.min(24, n));
+                        handleChange(
+                          "grid-template-columns",
+                          `repeat(${clamped}, minmax(0, 1fr))`,
+                        );
+                      }}
+                      onCommit={(v) => {
+                        const n = parseInt(v, 10);
+                        if (!Number.isFinite(n)) return;
+                        const clamped = Math.max(1, Math.min(24, n));
+                        handleCommit(
+                          "grid-template-columns",
+                          "Grid columns",
+                          `repeat(${clamped}, minmax(0, 1fr))`,
+                        );
+                      }}
+                      onFocus={() => handleDeferrableFocus("grid-template-columns")}
+                      onCancel={() => revertDeferrablePreview("grid-template-columns")}
+                    />
+                  )}
+                  <LayoutGapControl
+                    mode={isGridLayout ? "grid" : "flex"}
+                    flexDirection={flexDir.includes("column") ? "column" : "row"}
+                    gap={gapUnified}
+                    rowGap={rowGap}
+                    colGap={colGap}
+                    onGapChange={(v) => handleChange("gap", v)}
+                    onGapCommit={(v) => handleCommit("gap", "Gap", v)}
+                    onGapFocus={() => handleDeferrableFocus("gap")}
+                    onGapCancel={() => revertDeferrablePreview("gap")}
+                    onRowGapChange={(v) => handleChange("row-gap", v)}
+                    onRowGapCommit={(v) => handleCommit("row-gap", "Vertical gap", v)}
+                    onRowGapFocus={() => handleDeferrableFocus("row-gap")}
+                    onRowGapCancel={() => revertDeferrablePreview("row-gap")}
+                    onColGapChange={(v) => handleChange("column-gap", v)}
+                    onColGapCommit={(v) => handleCommit("column-gap", "Horizontal gap", v)}
+                    onColGapFocus={() => handleDeferrableFocus("column-gap")}
+                    onColGapCancel={() => revertDeferrablePreview("column-gap")}
+                  />
+                  <AlignmentControl
+                    justifyContent={justifyContent}
+                    alignItems={alignItems}
+                    flexDirection={flexDir}
+                    onJustifyCommit={(v) => {
+                      handleFocus("justify-content");
+                      handleCommit("justify-content", "Main Axis Alignment", v);
+                    }}
+                    onAlignCommit={(v) => {
+                      handleFocus("align-items");
+                      handleCommit("align-items", "Cross Axis Alignment", v);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </>
         )}
 
         {/* ── Box section — rendered for all categories ── */}
+        <SectionDivider />
         {BoxSection}
+        <SectionDivider />
+        {VisibilitySection}
       </div>
     </div>
   );

@@ -1,5 +1,20 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { NumberInput } from "./NumberInput";
+import {
+  BoxSidesToggleIcon,
+  MarginBottomIcon,
+  MarginHorizontalIcon,
+  MarginLeftIcon,
+  MarginRightIcon,
+  MarginTopIcon,
+  MarginVerticalIcon,
+  PaddingBottomIcon,
+  PaddingHorizontalIcon,
+  PaddingLeftIcon,
+  PaddingRightIcon,
+  PaddingTopIcon,
+  PaddingVerticalIcon,
+} from "./boxSpacingIcons";
 
 type BoxSide = "top" | "right" | "bottom" | "left";
 type BoxAxis = "v" | "h";
@@ -20,14 +35,34 @@ type BoxControlProps = {
   onDeferCancel?: (axis: BoxAxis | BoxSide) => void;
 };
 
-const FourSidesIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-    <rect x="0.5" y="0.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1" />
-    <rect x="7.5" y="0.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1" />
-    <rect x="0.5" y="7.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1" />
-    <rect x="7.5" y="7.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1" />
-  </svg>
-);
+const SIDE_ROWS: Array<[BoxSide, BoxSide]> = [
+  ["left", "top"],
+  ["right", "bottom"],
+];
+
+function sideIcon(property: "margin" | "padding", side: BoxSide): ReactNode {
+  if (property === "margin") {
+    const icons = {
+      left: <MarginLeftIcon />,
+      top: <MarginTopIcon />,
+      right: <MarginRightIcon />,
+      bottom: <MarginBottomIcon />,
+    };
+    return icons[side];
+  }
+  const icons = {
+    left: <PaddingLeftIcon />,
+    top: <PaddingTopIcon />,
+    right: <PaddingRightIcon />,
+    bottom: <PaddingBottomIcon />,
+  };
+  return icons[side];
+}
+
+function sideLabel(property: "margin" | "padding", side: BoxSide): string {
+  const name = property === "margin" ? "Margin" : "Padding";
+  return `${name} ${side}`;
+}
 
 export function BoxControl({
   property,
@@ -39,78 +74,74 @@ export function BoxControl({
 }: BoxControlProps) {
   const [mode, setMode] = useState<"vh" | "sides">("vh");
 
-  // In V/H mode display the average of the paired sides
   const vValue = Math.round((values.top + values.bottom) / 2);
   const hValue = Math.round((values.left + values.right) / 2);
 
   const label = property === "margin" ? "Margin" : "Padding";
   const minVal = property === "padding" ? 0 : -999;
 
-  return (
-    <div className="wv-box-control">
-      <div className="wv-box-header">
-        <span className="wv-section-label">{label}</span>
-        <button
-          type="button"
-          className={`wv-box-toggle wv-pe${mode === "sides" ? " wv-box-toggle--active" : ""}`}
-          title="Toggle 4-side mode"
-          onClick={() => setMode((m) => (m === "vh" ? "sides" : "vh"))}
-        >
-          <FourSidesIcon />
-        </button>
-      </div>
+  const hIcon =
+    property === "margin" ? <MarginHorizontalIcon /> : <PaddingHorizontalIcon />;
+  const vIcon =
+    property === "margin" ? <MarginVerticalIcon /> : <PaddingVerticalIcon />;
 
+  const renderField = (icon: ReactNode, axis: BoxAxis | BoxSide, value: number) => (
+    <div className="wv-typo-icon-card wv-box-spacing-card">
+      {icon}
+      <NumberInput
+        cssProperty={
+          axis === "h"
+            ? `${property}-left`
+            : axis === "v"
+              ? `${property}-top`
+              : `${property}-${axis}`
+        }
+        displayLabel={
+          axis === "h"
+            ? `${label} horizontal`
+            : axis === "v"
+              ? `${label} vertical`
+              : sideLabel(property, axis)
+        }
+        value={value}
+        unit="px"
+        min={minVal}
+        variant="card"
+        onChange={(v) => onChange(axis, parseFloat(v))}
+        onCommit={(v) => onCommit(axis, parseFloat(v))}
+        onFocus={() => onFocus?.(axis)}
+        onCancel={() => onDeferCancel?.(axis)}
+      />
+    </div>
+  );
+
+  return (
+    <div className="wv-box-spacing-row">
       {mode === "vh" ? (
-        <div className="wv-box-vh-row">
-          <div className="wv-box-input-group">
-            <span className="wv-box-axis-label">↕</span>
-            <NumberInput
-              cssProperty={`${property}-top`}
-              displayLabel={`${label} vertical`}
-              value={vValue}
-              unit="px"
-              min={minVal}
-              onChange={(v) => onChange("v", parseFloat(v))}
-              onCommit={(v) => onCommit("v", parseFloat(v))}
-              onFocus={() => onFocus?.("v")}
-              onCancel={() => onDeferCancel?.("v")}
-            />
-          </div>
-          <div className="wv-box-input-group">
-            <span className="wv-box-axis-label">↔</span>
-            <NumberInput
-              cssProperty={`${property}-left`}
-              displayLabel={`${label} horizontal`}
-              value={hValue}
-              unit="px"
-              min={minVal}
-              onChange={(v) => onChange("h", parseFloat(v))}
-              onCommit={(v) => onCommit("h", parseFloat(v))}
-              onFocus={() => onFocus?.("h")}
-              onCancel={() => onDeferCancel?.("h")}
-            />
-          </div>
+        <div className="wv-box-spacing-cards">
+          {renderField(hIcon, "h", hValue)}
+          {renderField(vIcon, "v", vValue)}
         </div>
       ) : (
-        <div className="wv-box-sides-grid">
-          {(["top", "right", "bottom", "left"] as BoxSide[]).map((side) => (
-            <div key={side} className="wv-box-input-group">
-              <span className="wv-box-axis-label">{side[0]?.toUpperCase()}</span>
-              <NumberInput
-                cssProperty={`${property}-${side}`}
-                displayLabel={`${label} ${side}`}
-                value={values[side]}
-                unit="px"
-                min={minVal}
-                onChange={(v) => onChange(side, parseFloat(v))}
-                onCommit={(v) => onCommit(side, parseFloat(v))}
-                onFocus={() => onFocus?.(side)}
-                onCancel={() => onDeferCancel?.(side)}
-              />
+        <div className="wv-box-spacing-sides">
+          {SIDE_ROWS.map(([a, b]) => (
+            <div key={`${a}-${b}`} className="wv-box-spacing-sides-row">
+              {renderField(sideIcon(property, a), a, values[a])}
+              {renderField(sideIcon(property, b), b, values[b])}
             </div>
           ))}
         </div>
       )}
+      <button
+        type="button"
+        className={`wv-box-spacing-toggle wv-pe${mode === "sides" ? " wv-box-spacing-toggle--active" : ""}`}
+        title={mode === "sides" ? "Use vertical / horizontal inputs" : "Edit each side"}
+        aria-label={mode === "sides" ? "Use vertical / horizontal inputs" : "Edit each side"}
+        aria-pressed={mode === "sides"}
+        onClick={() => setMode((m) => (m === "vh" ? "sides" : "vh"))}
+      >
+        <BoxSidesToggleIcon />
+      </button>
     </div>
   );
 }

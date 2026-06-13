@@ -1,4 +1,12 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import {
+  BoxSidesToggleIcon,
+  RadiusAllCornersIcon,
+  RadiusBottomLeftIcon,
+  RadiusBottomRightIcon,
+  RadiusTopLeftIcon,
+  RadiusTopRightIcon,
+} from "./boxSpacingIcons";
 import { NumberInput } from "./NumberInput";
 
 type CornerKey = "tl" | "tr" | "br" | "bl";
@@ -14,22 +22,9 @@ type RadiusControlProps = {
   onDeferCancel?: (corner: "all" | CornerKey) => void;
 };
 
-const CornerIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-    <path
-      d="M2 10V4a2 2 0 012-2h6"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-const CORNERS: Array<{ key: CornerKey; label: string }> = [
-  { key: "tl", label: "TL" },
-  { key: "tr", label: "TR" },
-  { key: "br", label: "BR" },
-  { key: "bl", label: "BL" },
+const CORNER_ROWS: Array<[CornerKey, CornerKey]> = [
+  ["tl", "tr"],
+  ["bl", "br"],
 ];
 
 const CORNER_CSS: Record<CornerKey, string> = {
@@ -38,6 +33,23 @@ const CORNER_CSS: Record<CornerKey, string> = {
   br: "border-bottom-right-radius",
   bl: "border-bottom-left-radius",
 };
+
+const CORNER_LABELS: Record<CornerKey, string> = {
+  tl: "Top Left",
+  tr: "Top Right",
+  br: "Bottom Right",
+  bl: "Bottom Left",
+};
+
+function cornerIcon(key: CornerKey): ReactNode {
+  const icons = {
+    tl: <RadiusTopLeftIcon />,
+    tr: <RadiusTopRightIcon />,
+    br: <RadiusBottomRightIcon />,
+    bl: <RadiusBottomLeftIcon />,
+  };
+  return icons[key];
+}
 
 export function RadiusControl({
   values,
@@ -50,57 +62,88 @@ export function RadiusControl({
 }: RadiusControlProps) {
   const [mode, setMode] = useState<"single" | "corners">("single");
 
-  // In single mode display the average of all four corners
   const avgRadius = Math.round((values.tl + values.tr + values.br + values.bl) / 4);
 
+  const renderRadiusField = (
+    corner: "all" | CornerKey,
+    icon: ReactNode,
+    value: number,
+    cssProperty: string,
+    displayLabel: string,
+    onChange: (v: string) => void,
+    onCommit: (v: string) => void,
+  ) => (
+    <div className="wv-typo-icon-card wv-box-spacing-card">
+      {icon}
+      <NumberInput
+        cssProperty={cssProperty}
+        displayLabel={displayLabel}
+        value={value}
+        unit="px"
+        min={0}
+        variant="card"
+        onChange={onChange}
+        onCommit={onCommit}
+        onFocus={() => onFocus?.(corner)}
+        onCancel={() => onDeferCancel?.(corner)}
+      />
+    </div>
+  );
+
   return (
-    <div className="wv-radius-control">
-      <div className="wv-box-header">
-        <span className="wv-section-label">Radius</span>
+    <div className="wv-box-subsection wv-radius-section">
+      <span className="wv-box-subsection-title">Corner Radius</span>
+
+      <div className="wv-box-spacing-row">
+        {mode === "single" ? (
+          <div className="wv-box-spacing-cards">
+            {renderRadiusField(
+              "all",
+              <RadiusAllCornersIcon />,
+              avgRadius,
+              "border-radius",
+              "Corner Radius",
+              onSingleChange,
+              onSingleCommit,
+            )}
+          </div>
+        ) : (
+          <div className="wv-box-spacing-sides">
+            {CORNER_ROWS.map(([a, b]) => (
+              <div key={`${a}-${b}`} className="wv-box-spacing-sides-row">
+                {renderRadiusField(
+                  a,
+                  cornerIcon(a),
+                  values[a],
+                  CORNER_CSS[a],
+                  `Corner Radius ${CORNER_LABELS[a]}`,
+                  (v) => onCornerChange(a, v),
+                  (v) => onCornerCommit(a, v),
+                )}
+                {renderRadiusField(
+                  b,
+                  cornerIcon(b),
+                  values[b],
+                  CORNER_CSS[b],
+                  `Corner Radius ${CORNER_LABELS[b]}`,
+                  (v) => onCornerChange(b, v),
+                  (v) => onCornerCommit(b, v),
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         <button
           type="button"
-          className={`wv-box-toggle wv-pe${mode === "corners" ? " wv-box-toggle--active" : ""}`}
-          title="Toggle per-corner mode"
+          className={`wv-box-spacing-toggle wv-pe${mode === "corners" ? " wv-box-spacing-toggle--active" : ""}`}
+          title={mode === "corners" ? "Use unified radius" : "Edit each corner"}
+          aria-label={mode === "corners" ? "Use unified radius" : "Edit each corner"}
+          aria-pressed={mode === "corners"}
           onClick={() => setMode((m) => (m === "single" ? "corners" : "single"))}
         >
-          <CornerIcon />
+          <BoxSidesToggleIcon />
         </button>
       </div>
-
-      {mode === "single" ? (
-        <div className="wv-box-input-group" style={{ paddingLeft: 0 }}>
-          <NumberInput
-            cssProperty="border-radius"
-            displayLabel="Radius"
-            value={avgRadius}
-            unit="px"
-            min={0}
-            onChange={onSingleChange}
-            onCommit={onSingleCommit}
-            onFocus={() => onFocus?.("all")}
-            onCancel={() => onDeferCancel?.("all")}
-          />
-        </div>
-      ) : (
-        <div className="wv-box-sides-grid">
-          {CORNERS.map(({ key, label }) => (
-            <div key={key} className="wv-box-input-group">
-              <span className="wv-box-axis-label">{label}</span>
-              <NumberInput
-                cssProperty={CORNER_CSS[key]}
-                displayLabel={`Radius ${label}`}
-                value={values[key]}
-                unit="px"
-                min={0}
-                onChange={(v) => onCornerChange(key, v)}
-                onCommit={(v) => onCornerCommit(key, v)}
-                onFocus={() => onFocus?.(key)}
-                onCancel={() => onDeferCancel?.(key)}
-              />
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

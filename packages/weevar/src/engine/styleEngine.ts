@@ -1,5 +1,6 @@
 import { elementChildren } from "./elementChildren";
 import type { ElementCategory } from "./layoutTypes";
+import { roundTo2 } from "./roundNumber";
 
 /**
  * Classify a DOM element into one of the V2 edit categories.
@@ -120,6 +121,67 @@ export function elementTypeLabel(el: Element, category: ElementCategory): string
   return tag.charAt(0).toUpperCase() + tag.slice(1);
 }
 
+/** Root `<svg>` for SVG category edits (selected node or nearest SVG ancestor). */
+export function resolveSvgRoot(el: Element): SVGSVGElement | null {
+  if (el instanceof SVGSVGElement) return el;
+  return el.closest("svg");
+}
+
+function parseSvgLengthPx(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const px = trimmed.match(/^([\d.]+)\s*px$/i);
+  if (px) {
+    const n = parseFloat(px[1]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  const n = parseFloat(trimmed);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Raw width/height on the SVG root (attribute, then inline/computed CSS). */
+export function readSvgDimensionRaw(el: Element, prop: "width" | "height"): string {
+  const svg = resolveSvgRoot(el);
+  if (!svg) return "";
+  const attr = svg.getAttribute(prop);
+  if (attr && attr.trim() !== "") return attr.trim();
+  return readPropertyValue(svg, prop);
+}
+
+/** Display size of the SVG root in pixels. */
+export function readSvgDimension(el: Element, prop: "width" | "height"): number {
+  const svg = resolveSvgRoot(el);
+  if (!svg) return 0;
+
+  const fromRaw = parseSvgLengthPx(readSvgDimensionRaw(el, prop));
+  if (fromRaw != null) return roundTo2(fromRaw);
+
+  const rect = svg.getBoundingClientRect();
+  const px = prop === "width" ? rect.width : rect.height;
+  return roundTo2(px);
+}
+
+/** Apply width/height to the SVG root (attribute + inline style). */
+export function applySvgDimension(
+  el: Element,
+  prop: "width" | "height",
+  value: string,
+): void {
+  const svg = resolveSvgRoot(el);
+  if (!svg) return;
+
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    svg.removeAttribute(prop);
+    (svg as unknown as HTMLElement).style.removeProperty(prop);
+    return;
+  }
+
+  const pxStr = /px$/i.test(trimmed) ? trimmed : `${trimmed}px`;
+  svg.setAttribute(prop, pxStr);
+  (svg as unknown as HTMLElement).style.setProperty(prop, pxStr);
+}
+
 /**
  * Read a CSS property value from an element.
  * Prefers the element's own inline style if set; falls back to computed style.
@@ -141,7 +203,7 @@ export function readLineHeightAsPixelNumber(el: Element): number {
   const cs = getComputedStyle(el);
   const fontSize = parseFloat(cs.fontSize) || 16;
 
-  const roundPx = (px: number): number => Math.round(px * 10) / 10;
+  const roundPx = (px: number): number => roundTo2(px);
 
   const parsePxString = (s: string): number | null => {
     const m = s.trim().match(/^([\d.]+)\s*px$/i);
@@ -432,6 +494,19 @@ export function readBorderValues(
     width: parseFloat(cs.borderWidth) || 0,
     style: cs.borderStyle || "none",
     color: readCssColorForPicker(el, "border-color"),
+  };
+}
+
+/** Per-side border widths in pixels (from computed style). */
+export function readBorderWidthValues(
+  el: Element,
+): { top: number; right: number; bottom: number; left: number } {
+  const cs = getComputedStyle(el);
+  return {
+    top: parseFloat(cs.borderTopWidth) || 0,
+    right: parseFloat(cs.borderRightWidth) || 0,
+    bottom: parseFloat(cs.borderBottomWidth) || 0,
+    left: parseFloat(cs.borderLeftWidth) || 0,
   };
 }
 

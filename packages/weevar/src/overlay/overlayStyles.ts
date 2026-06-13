@@ -10,6 +10,7 @@ export const OVERLAY_CSS = `
   --wv-accent: #0099ff;
   --wv-success: #00c896;
   --wv-danger: #ff4d4f;
+  --wv-selection: #777778;
   --wv-ui: 13px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   --wv-mono: 12px Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
@@ -22,6 +23,7 @@ export const OVERLAY_CSS = `
   pointer-events: none;
   font: var(--wv-ui);
   color: #e8eaed;
+  color-scheme: dark;
 }
 
 .wv-root,
@@ -1043,6 +1045,12 @@ export const OVERLAY_CSS = `
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.wv-tray-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 .wv-tray-content-summary {
   flex: 1 1 auto;
@@ -1643,90 +1651,230 @@ export const OVERLAY_CSS = `
   font-size: 11px;
 }
 
-/* ─── Opacity scrubber (unblocks the track) ──────────────────────── */
-.wv-opacity-row {
+/* ─── Opacity card (Figma 324:8121 + hover scrub) ──────────────────────── */
+.wv-opacity-card {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.wv-opacity-card--interactive {
+  cursor: ew-resize;
+}
+
+.wv-opacity-card-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  z-index: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  pointer-events: auto;
-}
-.wv-opacity-track {
-  flex: 1;
-  height: 6px;
-  background: var(--wv-border);
-  border-radius: 3px;
-  cursor: ew-resize;
-  position: relative;
-  pointer-events: auto;
-  user-select: none;
-}
-.wv-opacity-fill {
-  height: 100%;
-  background: var(--wv-accent);
-  border-radius: 3px;
+  height: 7px;
+  transform: translateY(-50%);
   pointer-events: none;
 }
-.wv-opacity-value {
+
+.wv-opacity-card-tick {
+  flex: 0 0 2px;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #414144;
+}
+
+.wv-opacity-card-tick-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-opacity-card-ticks--dim .wv-opacity-card-tick {
+  opacity: 0.3;
+}
+
+.wv-opacity-card-ticks--bright .wv-opacity-card-tick {
+  opacity: 1;
+}
+
+.wv-opacity-card-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  height: 100%;
+  background: #58585d;
+  pointer-events: none;
+}
+
+.wv-opacity-card--interactive .wv-opacity-card-fill {
+  background: rgba(88, 88, 93, 0.8);
+}
+
+.wv-opacity-card-thumb {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: #ebebeb;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.wv-opacity-card-thumb--dim {
+  opacity: 0.3;
+}
+
+.wv-opacity-card-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+
+.wv-opacity-card-label {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-size: 11px;
-  color: #aaa;
-  width: 32px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-opacity-card-value-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+  min-width: 0;
+  pointer-events: auto;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.wv-opacity-card-value-input {
+  width: auto;
+  min-width: 20px;
+  max-width: 48px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
   text-align: right;
+  outline: none;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.wv-opacity-card-value-unit {
+  flex-shrink: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  pointer-events: none;
+}
+
+.wv-opacity-card--editing-value {
+  cursor: default;
+}
+
+.wv-opacity-card--editing-value.wv-opacity-card--interactive {
+  cursor: default;
+}
+
+/* ─── Layout type selector icons ─────────────────────────────────── */
+.wv-layout-type-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
 }
 
-/* ─── Layout type toggle (row / column / grid) ────────────────────── */
-.wv-layout-type-toggle {
-  display: flex;
-  gap: 2px;
-  background: var(--wv-panel);
-  border: 1px solid var(--wv-border);
-  border-radius: 6px;
-  padding: 3px;
+/* ─── 3×3 arrangement grid ─────────────────────────────────────────── */
+.wv-alignment-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
 }
-.wv-layout-type-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 28px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: #666;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: background 0.1s, color 0.1s;
-}
-.wv-layout-type-btn:hover { color: #e8eaed; background: rgba(255,255,255,0.06); }
-.wv-layout-type-btn--active { background: var(--wv-accent); color: #fff; }
 
-/* ─── 3×3 alignment grid ──────────────────────────────────────────── */
+.wv-alignment-dot {
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
 .wv-alignment-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  padding: 4px 0 8px;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  border-radius: 10px;
+  overflow: hidden;
   pointer-events: auto;
 }
+
 .wv-alignment-cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 32px;
-  border: 1px solid var(--wv-border);
-  border-radius: 5px;
-  background: var(--wv-panel);
-  color: #666;
+  height: 24px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: rgba(235, 235, 235, 0.05);
+  color: #58585d;
   cursor: pointer;
   pointer-events: auto;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  box-sizing: border-box;
 }
-.wv-alignment-cell:hover { color: #e8eaed; border-color: #444; }
-.wv-alignment-cell--active {
-  background: var(--wv-accent);
-  border-color: var(--wv-accent);
-  color: #fff;
+
+.wv-alignment-cell:hover:not(.wv-alignment-cell--active) {
+  color: #ebebeb;
+}
+
+.wv-alignment-cell--active,
+.wv-alignment-cell--active:hover {
+  background: rgba(235, 235, 235, 0.05);
+  color: #c7c7c7;
 }
 
 /* ─── V2 EditTray shell ─────────────────────────────────────────────── */
@@ -1878,7 +2026,7 @@ export const OVERLAY_CSS = `
   border: 1px solid var(--wv-border);
   border-radius: 4px;
   color: #e8eaed;
-  font-size: 12px;
+  font-size: 11px;
   font-family: inherit;
   height: 24px;
   padding: 0 6px;
@@ -1887,6 +2035,8 @@ export const OVERLAY_CSS = `
   outline: none;
   transition: border-color 0.15s;
   pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .wv-number-input:focus { border-color: var(--wv-accent); }
 .wv-number-input:disabled,
@@ -1935,7 +2085,7 @@ export const OVERLAY_CSS = `
   align-items: center;
   flex: 0 0 auto;
   padding: 0 6px 0 0;
-  font-size: 12px;
+  font-size: 11px;
   font-family: inherit;
   color: #9aa0a6;
   user-select: none;
@@ -1949,7 +2099,7 @@ export const OVERLAY_CSS = `
   border: 1px solid var(--wv-border);
   border-radius: 4px;
   color: #e8eaed;
-  font-size: 12px;
+  font-size: 11px;
   font-family: inherit;
   height: 24px;
   padding: 0 4px;
@@ -2103,7 +2253,7 @@ export const OVERLAY_CSS = `
 .wv-typo-card-label {
   flex-shrink: 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 400;
   line-height: 100%;
@@ -2111,11 +2261,69 @@ export const OVERLAY_CSS = `
   white-space: nowrap;
 }
 
+.wv-card-select {
+  position: relative;
+  cursor: pointer;
+}
+
+.wv-card-select-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.wv-card-select-value {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+}
+
+.wv-card-select .wv-typo-chevron {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.wv-card-select-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  pointer-events: auto;
+}
+
 .wv-typo-dual-row {
   display: flex;
   align-items: stretch;
   gap: 8px;
   width: 100%;
+  min-width: 0;
+}
+
+/* Dimension fields — W/H side by side + aspect lock (SVG, Box) */
+.wv-dimension-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-dimension-row .wv-typo-card {
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -2144,7 +2352,7 @@ export const OVERLAY_CSS = `
   padding: 0;
   margin: 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-style: normal !important;
   font-weight: 400 !important;
   line-height: 100% !important;
@@ -2193,12 +2401,14 @@ export const OVERLAY_CSS = `
   background: transparent;
   color: #c7c7c7;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
   line-height: 100%;
   text-align: right;
   outline: none;
   cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .wv-weight-card-chevron {
@@ -2263,11 +2473,12 @@ export const OVERLAY_CSS = `
   border-radius: 0 12px 12px 0;
 }
 
-.wv-segmented--typo .wv-segmented-btn:hover {
+.wv-segmented--typo .wv-segmented-btn:hover:not([data-active="true"]) {
   color: #ebebeb;
 }
 
-.wv-segmented--typo .wv-segmented-btn[data-active="true"] {
+.wv-segmented--typo .wv-segmented-btn[data-active="true"],
+.wv-segmented--typo .wv-segmented-btn[data-active="true"]:hover {
   background: #58585d;
   color: #ebebeb;
 }
@@ -2402,7 +2613,7 @@ export const OVERLAY_CSS = `
   flex: 1 1 0;
   min-width: 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 400;
   line-height: 100%;
@@ -2431,7 +2642,7 @@ export const OVERLAY_CSS = `
   border-radius: 0;
   background: transparent;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-style: normal !important;
   font-weight: 400 !important;
   line-height: 100% !important;
@@ -2439,6 +2650,8 @@ export const OVERLAY_CSS = `
   text-align: right;
   outline: none;
   pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .wv-color-card-hex:focus,
@@ -2449,7 +2662,7 @@ export const OVERLAY_CSS = `
 .wv-color-card-alpha-unit {
   flex-shrink: 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
   line-height: 100%;
   color: #c7c7c7;
@@ -2467,10 +2680,6 @@ export const OVERLAY_CSS = `
   border-top: 1px solid rgba(235, 235, 235, 0.05);
   flex-shrink: 0;
   pointer-events: none;
-}
-
-.wv-box-control + .wv-color-card {
-  margin-top: 8px;
 }
 
 /* ─── Style section (Figma) ──────────────────────────────────────────── */
@@ -2494,6 +2703,11 @@ export const OVERLAY_CSS = `
   border-top: 1px solid rgba(235, 235, 235, 0.05);
   flex-shrink: 0;
   pointer-events: none;
+}
+
+/* Box divider when no type-specific section precedes it (e.g. generic). */
+.wv-edit-controls > .wv-section-divider:first-child {
+  margin-top: 0;
 }
 
 .wv-style-section-head {
@@ -2535,12 +2749,59 @@ export const OVERLAY_CSS = `
   color: #c7c7c7;
 }
 
-/* Box section — Figma 324:7710 (16px below divider, 16px to content) */
+/* Box section — Figma 324:7710 (16px below divider, 12px title to content) */
 .wv-box-section {
   margin-top: 0;
 }
 
+.wv-box-section.wv-style-section {
+  gap: 12px;
+}
+
+.wv-visibility-section.wv-style-section {
+  gap: 12px;
+}
+
+.wv-layout-section.wv-style-section {
+  gap: 12px;
+}
+
+.wv-layout-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-layout-gap-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-layout-gap-card,
+.wv-layout-columns-card {
+  width: 100%;
+}
+
+.wv-layout-gap-row .wv-layout-gap-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-visibility-section-body {
+  width: 100%;
+  min-width: 0;
+}
+
 .wv-section-divider + .wv-box-section {
+  margin-top: 0;
+}
+
+.wv-section-divider + .wv-layout-section {
   margin-top: 0;
 }
 
@@ -2552,9 +2813,18 @@ export const OVERLAY_CSS = `
   min-width: 0;
 }
 
+.wv-box-section-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
 .wv-box-section-body > .wv-edit-section-label {
   margin-top: 0;
   padding-top: 0;
+  padding-bottom: 0;
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
@@ -2562,7 +2832,83 @@ export const OVERLAY_CSS = `
   color: #868689;
 }
 
-/* ─── BoxControl ─────────────────────────────────────────────────────── */
+.wv-box-section-body .wv-box-header {
+  margin-bottom: 0;
+}
+
+/* Box spacing — Figma 337:1994 / 324:8196 */
+.wv-box-spacing-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-spacing-cards,
+.wv-box-spacing-sides {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-box-spacing-cards {
+  gap: 8px;
+}
+
+.wv-box-spacing-sides {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wv-box-spacing-sides-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-spacing-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-box-spacing-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  margin: 0;
+  border: 1px solid rgba(235, 235, 235, 0.05);
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  color: #ffffff;
+  cursor: pointer;
+  pointer-events: auto;
+  box-sizing: border-box;
+  line-height: 0;
+}
+
+.wv-box-spacing-toggle:hover:not(.wv-box-spacing-toggle--active):not(:disabled) {
+  background: rgba(235, 235, 235, 0.08);
+}
+
+.wv-box-spacing-toggle--active,
+.wv-box-spacing-toggle--active:hover {
+  background: #58585d;
+}
+
+.wv-box-spacing-toggle-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ─── BoxControl (legacy radius header) ──────────────────────────────── */
 
 .wv-box-control { padding: 4px 0; }
 
@@ -2615,38 +2961,172 @@ export const OVERLAY_CSS = `
   flex-shrink: 0;
 }
 
-/* ─── BorderControl ──────────────────────────────────────────────────── */
+/* ─── Box subsections (Border, Corner Radius, …) ─────────────────────── */
 
-.wv-border-row {
+.wv-box-subsection,
+.wv-border-section,
+.wv-radius-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wv-box-subsection-title,
+.wv-border-section-title {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 100%;
+  color: #868689;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
+.wv-border-style-card {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 0;
-  flex-wrap: nowrap;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(235, 235, 235, 0.05);
+  box-sizing: border-box;
+  color: #c7c7c7;
+  cursor: pointer;
+}
+
+.wv-border-style-value {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.wv-border-style-card .wv-typo-chevron {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.wv-border-style-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.wv-box-spacing-cards .wv-border-weight-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-box-spacing-sides-row .wv-border-weight-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wv-border-weight-card--disabled .wv-typo-card-label {
+  opacity: 0.42;
+}
+
+.wv-box-spacing-toggle:disabled {
+  opacity: 0.42;
+  cursor: default;
 }
 
 /* ─── RadiusControl ──────────────────────────────────────────────────── */
-
-.wv-radius-control { padding: 4px 0; }
-
 /* Selection tray: 14px horizontal inset is only on .wv-tray-content-selection */
 .wv-tray-content-selection .wv-edit-tray-head,
 .wv-tray-content-selection .wv-typo-stack,
 .wv-tray-content-selection .wv-section-divider,
 .wv-tray-content-selection .wv-style-section,
 .wv-tray-content-selection .wv-box-section,
+.wv-tray-content-selection .wv-visibility-section,
+.wv-tray-content-selection .wv-layout-section,
 .wv-tray-content-selection .wv-edit-section-label,
 .wv-tray-content-selection .wv-prop-row,
-.wv-tray-content-selection .wv-opacity-row,
 .wv-tray-content-selection .wv-alignment-grid,
-.wv-tray-content-selection .wv-box-control,
-.wv-tray-content-selection .wv-border-row,
-.wv-tray-content-selection .wv-radius-control {
+.wv-tray-content-selection .wv-box-spacing-row,
+.wv-tray-content-selection .wv-border-section,
+.wv-tray-content-selection .wv-radius-section,
+.wv-tray-content-selection .wv-box-subsection,
+.wv-tray-content-selection .wv-box-control {
   padding-left: 0;
   padding-right: 0;
 }
 
 .wv-tray-content-selection .wv-edit-props-card {
   padding: 10px !important;
+}
+
+/* Text selection in editable tray fields — must target inputs directly (WebKit). */
+.wv-edit-tray input,
+.wv-edit-tray textarea {
+  color-scheme: dark;
+}
+
+.wv-edit-tray input::selection,
+.wv-edit-tray input:focus::selection,
+.wv-edit-tray textarea::selection,
+.wv-edit-tray textarea:focus::selection,
+.wv-number-input::selection,
+.wv-number-input:focus::selection,
+.wv-number-input--card::selection,
+.wv-number-input--card:focus::selection,
+.wv-opacity-card-value-input::selection,
+.wv-opacity-card-value-input:focus::selection,
+.wv-color-card-hex::selection,
+.wv-color-card-hex:focus::selection,
+.wv-color-card-alpha::selection,
+.wv-color-card-alpha:focus::selection,
+.wv-weight-custom-input::selection,
+.wv-weight-custom-input:focus::selection,
+.wv-weight-custom-input--card::selection,
+.wv-weight-custom-input--card:focus::selection {
+  background-color: #777778 !important;
+  color: #ebebeb !important;
+}
+
+.wv-edit-tray input::-moz-selection,
+.wv-edit-tray input:focus::-moz-selection,
+.wv-edit-tray textarea::-moz-selection,
+.wv-edit-tray textarea:focus::-moz-selection,
+.wv-number-input::-moz-selection,
+.wv-number-input:focus::-moz-selection,
+.wv-number-input--card::-moz-selection,
+.wv-number-input--card:focus::-moz-selection,
+.wv-opacity-card-value-input::-moz-selection,
+.wv-opacity-card-value-input:focus::-moz-selection,
+.wv-color-card-hex::-moz-selection,
+.wv-color-card-hex:focus::-moz-selection,
+.wv-color-card-alpha::-moz-selection,
+.wv-color-card-alpha:focus::-moz-selection,
+.wv-weight-custom-input::-moz-selection,
+.wv-weight-custom-input:focus::-moz-selection,
+.wv-weight-custom-input--card::-moz-selection,
+.wv-weight-custom-input--card:focus::-moz-selection {
+  background-color: #777778 !important;
+  color: #ebebeb !important;
 }
 `;

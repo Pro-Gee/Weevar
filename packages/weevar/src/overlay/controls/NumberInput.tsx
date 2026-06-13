@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from "react";
+import { formatNumberMax2, roundTo2 } from "../../engine/roundNumber";
 
 type NumberInputProps = {
   cssProperty: string;
@@ -45,10 +46,13 @@ export function NumberInput({
 
   // Keep display in sync when value changes externally (e.g. undo)
   useEffect(() => {
-    if (!editing) setRaw(String(value));
+    if (!editing) setRaw(formatNumberMax2(value));
   }, [value, editing]);
 
-  const format = (n: number): string => (unit ? `${n}${unit}` : String(n));
+  const format = (n: number): string => {
+    const s = formatNumberMax2(n);
+    return unit ? `${s}${unit}` : s;
+  };
 
   const hasUnit = unit !== "";
 
@@ -58,14 +62,14 @@ export function NumberInput({
     let clamped = n;
     if (min !== undefined) clamped = Math.max(min, clamped);
     if (max !== undefined) clamped = Math.min(max, clamped);
-    return parseFloat(clamped.toFixed(2));
+    return roundTo2(clamped);
   };
 
   const commit = (inputRaw: string) => {
     setEditing(false);
     const n = parseAndClamp(inputRaw);
     if (n === null) {
-      setRaw(String(value)); // revert display to last known good value
+      setRaw(formatNumberMax2(value)); // revert display to last known good value
       return;
     }
     const formatted = format(n);
@@ -79,7 +83,7 @@ export function NumberInput({
     onFocus: () => {
       fromRef.current = format(value);
       setEditing(true);
-      setRaw(String(value));
+      setRaw(formatNumberMax2(value));
       onFocus?.();
     },
     onChange: (e: ChangeEvent<HTMLInputElement>) => {
@@ -108,7 +112,7 @@ export function NumberInput({
         const delta = e.key === "ArrowUp" ? step : -step;
         const next = parseAndClamp(String(current + delta));
         if (next !== null) {
-          setRaw(String(next));
+          setRaw(formatNumberMax2(next));
           onChange(format(next));
         }
       }
@@ -133,7 +137,7 @@ export function NumberInput({
       <input
         type="text"
         className={`wv-number-input wv-pe${cardClass}`}
-        value={editing ? raw : String(value)}
+        value={editing ? raw : formatNumberMax2(value)}
         aria-label={displayLabel}
         disabled={disabled}
         {...sharedHandlers}

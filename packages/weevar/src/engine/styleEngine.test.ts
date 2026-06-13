@@ -5,6 +5,10 @@ import {
   cssPaintValuesEqual,
   elementTypeLabel,
   readLineHeightAsPixelNumber,
+  readSvgDimension,
+  readSvgDimensionRaw,
+  resolveSvgRoot,
+  applySvgDimension,
   rgbToHex,
   supportsCssBackgroundColor,
   supportsCssTextColor,
@@ -112,6 +116,41 @@ describe("elementTypeLabel", () => {
     d.appendChild(document.createTextNode("hello"));
     document.body.appendChild(d);
     expect(elementTypeLabel(d, "text")).toBe("Text");
+  });
+});
+
+describe("svg dimensions", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("reads width and height from svg attributes", () => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "48");
+    svg.setAttribute("height", "32");
+    document.body.appendChild(svg);
+    expect(readSvgDimension(svg, "width")).toBe(48);
+    expect(readSvgDimension(svg, "height")).toBe(32);
+    expect(readSvgDimensionRaw(svg, "width")).toBe("48");
+  });
+
+  it("resolves inner svg nodes to the root svg", () => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "24");
+    svg.setAttribute("height", "24");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    svg.appendChild(path);
+    document.body.appendChild(svg);
+    expect(resolveSvgRoot(path)).toBe(svg);
+    expect(readSvgDimension(path, "width")).toBe(24);
+  });
+
+  it("applySvgDimension sets attribute and inline style", () => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.appendChild(svg);
+    applySvgDimension(svg, "width", "64");
+    expect(svg.getAttribute("width")).toBe("64px");
+    expect((svg as unknown as HTMLElement).style.width).toBe("64px");
   });
 });
 

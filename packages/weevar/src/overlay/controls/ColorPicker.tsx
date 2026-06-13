@@ -25,6 +25,8 @@ type ColorPickerProps = {
   variant?: "default" | "card";
   /** First-row label when `variant="card"` (e.g. Font, Colour). */
   cardLabel?: string;
+  /** Second-row label when `variant="card"` (default Fill Opacity). */
+  opacityLabel?: string;
 };
 
 function isValidOpaqueHex(s: string): boolean {
@@ -107,6 +109,7 @@ export function ColorPicker({
   disabled = false,
   variant = "default",
   cardLabel = "Colour",
+  opacityLabel = "Fill Opacity",
 }: ColorPickerProps) {
   const fullValue = isValidFullHex(value) ? value.toLowerCase() : "#000000";
   const displayOpaqueHex = opaqueHexFromPickerColor(fullValue).toLowerCase();
@@ -488,7 +491,7 @@ export function ColorPicker({
         </div>
         <div className="wv-color-card-divider" aria-hidden />
         <div className="wv-color-card-row">
-          <span className="wv-color-card-label">Fill Opacity</span>
+          <span className="wv-color-card-label">{opacityLabel}</span>
           <div className="wv-color-card-value">
             <input type="text" className="wv-color-card-alpha wv-pe" {...alphaInputProps} />
             <span className="wv-color-card-alpha-unit">%</span>
