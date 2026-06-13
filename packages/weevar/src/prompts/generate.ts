@@ -8,6 +8,7 @@ import type {
   WeevarChange,
   WeevarRuntimeConfig,
 } from "../engine/layoutTypes";
+import { isTextLikeTag } from "../engine/elementText";
 
 type PromptOptions = {
   targetTool: TargetTool | "cursor";
@@ -118,21 +119,59 @@ function cssTagRef(id: ElementIdentity): string {
   return `<${id.tag}.${id.classList.join(".")}>`;
 }
 
+/** Prefer DOM tag+class when classes exist; fall back to component name. */
+function domFirstRef(id: ElementIdentity): string {
+  if (id.classList.length) return cssTagRef(id);
+  if (id.componentName) return `<${id.componentName}>`;
+  return cssTagRef(id);
+}
+
 function baseRef(id: ElementIdentity): string {
   if (id.componentName) return `<${id.componentName}>`;
   return cssTagRef(id);
 }
 
-function withDisambiguation(id: ElementIdentity, force = false): string {
-  const root = baseRef(id);
-  if (!force && id.componentName) return root;
-  if (id.textSnippet) return `${root.replace(/>$/, "")} "${id.textSnippet}">`;
-  if (id.classList.length && id.componentName) return `${root.replace(/>$/, "")}.${id.classList[0]}>`;
+function childCountLabel(count: number): string {
+  return count === 1 ? "1 element child" : `${count} element children`;
+}
+
+/**
+ * Human-readable ref for layout moves/reorders.
+ * Uses tag+class for styled elements, text only on text-like tags, child count for containers.
+ */
+function layoutElementRef(id: ElementIdentity, force = false): string {
+  const root = domFirstRef(id);
+  const open = root.replace(/>$/, "");
+
+  if (isTextLikeTag(id.tag) && id.textSnippet) {
+    return `${open} "${id.textSnippet}">`;
+  }
+
+  if (id.childElementCount && id.childElementCount > 0) {
+    return `${root} (${childCountLabel(id.childElementCount)})`;
+  }
+
+  if (force && id.textSnippet) {
+    return `${open} "${id.textSnippet}">`;
+  }
+
+  if (force && id.source?.line) {
+    return `${open} @line ${id.source.line}>`;
+  }
+
   return root;
 }
 
+function withDisambiguation(id: ElementIdentity, force = false): string {
+  return layoutElementRef(id, force);
+}
+
 function jsxRef(id: ElementIdentity): string {
-  return `${withDisambiguation(id).replace(/>$/, "")} />`;
+  return `${layoutElementRef(id).replace(/>$/, "")} />`;
+}
+
+function styleTargetRef(id: ElementIdentity): string {
+  return domFirstRef(id);
 }
 
 function domPathTail(id: ElementIdentity, segments = 3): string {
@@ -157,8 +196,13 @@ function identityBlock(id: ElementIdentity): string {
  * keeps human-readable symbol + concrete source/path anchors for deterministic edits.
  */
 function strictRef(id: ElementIdentity): string {
-  const core = withDisambiguation(id, true);
+  const core = layoutElementRef(id);
   return `${core} ${identityBlock(id)}`;
+}
+
+function moveSubtreeNote(id: ElementIdentity): string {
+  if (!id.childElementCount || id.childElementCount <= 0) return "";
+  return ` Move the entire element subtree (${childCountLabel(id.childElementCount)}); do not split or recreate nested nodes.`;
 }
 
 function displacementAnchor(siblings: ElementIdentity[], toIndex: number): string {
@@ -166,7 +210,7 @@ function displacementAnchor(siblings: ElementIdentity[], toIndex: number): strin
   if (toIndex <= 0) return "first";
   if (toIndex >= siblings.length - 1) return "last";
   const prev = siblings[toIndex - 1];
-  return `after ${baseRef(prev)}`;
+  return `after ${layoutElementRef(prev)}`;
 }
 
 function detailedAnchor(siblings: ElementIdentity[], toIndex: number): string {
@@ -194,13 +238,13 @@ function moveSiblings(change: Extract<LayoutChange, { kind: "move" }>): ElementI
 function buildSiblingRenderData(siblings: ElementIdentity[]) {
   const counts = new Map<string, number>();
   for (const s of siblings) {
-    const k = baseRef(s);
+    const k = layoutElementRef(s);
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
   return siblings.map((s) => {
-    const k = baseRef(s);
+    const k = layoutElementRef(s);
     const repeated = (counts.get(k) ?? 0) > 1;
-    return withDisambiguation(s, repeated);
+    return layoutElementRef(s, repeated);
   });
 }
 
@@ -245,7 +289,7 @@ function shortMove(change: Extract<LayoutChange, { kind: "move" }>): string {
   const order = buildSiblingRenderData(siblings)
     .map((s, i) => `${i}: ${s}`)
     .join(" | ");
-  return `Move ${targetRef}${line} from ${fromRef}${fromLoc ? ` (${fromLoc})` : ""} (child index ${change.fromIndex}) into ${toRef}${toLoc ? ` (${toLoc})` : ""} at child index ${change.toIndex} (${shortAnchor}). Destination order after move: ${order}. Preserve all props.`;
+  return `Move ${targetRef}${line} from ${fromRef}${fromLoc ? ` (${fromLoc})` : ""} (child index ${change.fromIndex}) into ${toRef}${toLoc ? ` (${toLoc})` : ""} at child index ${change.toIndex} (${shortAnchor}). Destination order after move: ${order}.${moveSubtreeNote(change.target)} Preserve all props and nested structure unchanged.`;
 }
 
 function detailedReorder(change: Extract<LayoutChange, { kind: "reorder" }>, tool: PromptOptions["targetTool"]): string {
@@ -265,12 +309,12 @@ function detailedReorder(change: Extract<LayoutChange, { kind: "reorder" }>, too
       return `${i + 1}. ${refs[i]}${loc}${moved}`;
     })
     .join("\n");
-  const heading = `# Reorder within ${baseRef(change.parent)}`;
+  const heading = `# Reorder within ${layoutElementRef(change.parent)}`;
   const fileLine = `**File:** ${file}`;
   const classSnippet = change.parent.classList.length
     ? ` — \`<${change.parent.tag} className="${change.parent.classList.join(" ")}">\``
     : "";
-  const container = `**Container:** ${baseRef(change.parent)}${containerLine ? ` at line ${containerLine}` : ""}${classSnippet}`;
+  const container = `**Container:** ${layoutElementRef(change.parent)}${containerLine ? ` at line ${containerLine}` : ""}${classSnippet}`;
   const layout = `**Layout:** ${formatLayoutType(change.layoutType)}`;
   const move = [
     "## Move",
@@ -280,7 +324,7 @@ function detailedReorder(change: Extract<LayoutChange, { kind: "reorder" }>, too
   ].join("\n");
   const constraints = [
     "## Constraints",
-    `- Preserve all props on ${baseRef(change.target)}`,
+    `- Preserve all props on ${layoutElementRef(change.target)}`,
     `- Don't modify the ${formatLayoutType(change.layoutType)} layout`,
     "- Don't introduce wrapper elements",
     "- Don't touch other components in this file",
@@ -311,25 +355,35 @@ function detailedMove(change: Extract<LayoutChange, { kind: "move" }>, tool: Pro
       return `${i + 1}. ${refs[i]}${loc}${moved}`;
     })
     .join("\n");
-  const source = `**Source:** ${baseRef(change.fromParent)}${change.fromParent.source ? ` in ${formatLocation(change.fromParent.source)}` : ""} (${formatLayoutType(change.fromLayoutType)} layout)`;
-  const destination = `**Destination:** ${baseRef(change.toParent)}${change.toParent.source ? ` in ${formatLocation(change.toParent.source)}` : ""} (${formatLayoutType(change.toLayoutType)} layout)`;
+  const source = `**Source:** ${layoutElementRef(change.fromParent)}${change.fromParent.source ? ` in ${formatLocation(change.fromParent.source)}` : ""} (${formatLayoutType(change.fromLayoutType)} layout)`;
+  const destination = `**Destination:** ${layoutElementRef(change.toParent)}${change.toParent.source ? ` in ${formatLocation(change.toParent.source)}` : ""} (${formatLayoutType(change.toLayoutType)} layout)`;
   const anchor = displacementAnchor(siblings, change.toIndex);
+  const targetDom = layoutElementRef(change.target);
   const move = [
     "## Move",
     `${jsxRef(change.target)}${change.target.source ? ` at ${formatLocation(change.target.source)}` : ""}`,
-    `Remove from: ${baseRef(change.fromParent)}, index ${change.fromIndex}`,
-    `Insert into: ${baseRef(change.toParent)}, index ${change.toIndex} (${anchor})`,
+    `Remove from: ${layoutElementRef(change.fromParent)}, child index ${change.fromIndex}`,
+    `Insert into: ${layoutElementRef(change.toParent)}, child index ${change.toIndex} (${anchor})`,
+    ...(change.target.childElementCount && change.target.childElementCount > 0
+      ? [
+          "",
+          `**Subtree:** ${targetDom} includes ${childCountLabel(change.target.childElementCount)}. Cut and paste the element with all nested JSX unchanged — do not extract, split, or recreate children.`,
+        ]
+      : []),
   ].join("\n");
   const constraints = [
     "## Constraints",
-    `- Preserve all props on ${baseRef(change.target)}`,
-    `- Don't modify ${baseRef(change.fromParent)} beyond removing the element`,
-    `- Don't modify ${baseRef(change.toParent)}'s layout or styling`,
+    `- Preserve all props on ${targetDom}`,
+    `- Don't modify ${layoutElementRef(change.fromParent)} beyond removing the element`,
+    `- Don't modify ${layoutElementRef(change.toParent)}'s layout or styling`,
     "- Don't introduce wrapper elements",
+    ...(change.target.childElementCount && change.target.childElementCount > 0
+      ? ["- Move the full subtree; child index refers to the container element, not its text content"]
+      : []),
   ].join("\n");
 
   const parts = [
-    `# Move ${baseRef(change.target)} across containers`,
+    `# Move ${targetDom} across containers`,
     "",
     source,
     destination,
@@ -351,7 +405,7 @@ function detailedMove(change: Extract<LayoutChange, { kind: "move" }>, tool: Pro
 }
 
 function shortStyleTweak(change: StyleTweak): string {
-  const ref = baseRef(change.target);
+  const ref = styleTargetRef(change.target);
   const block = identityBlock(change.target);
 
   const displayChange = change.changes.find((c) => c.cssProperty === "display");
@@ -374,7 +428,7 @@ function shortStyleTweak(change: StyleTweak): string {
 
 function detailedStyleTweak(change: StyleTweak, options: PromptOptions): string {
   const showTailwind = options.config?.prompts?.tailwindVerbatimClasses === true;
-  const ref = baseRef(change.target);
+  const ref = styleTargetRef(change.target);
   const src = change.target.source;
   const classes = change.target.classList;
 

@@ -105,7 +105,7 @@ describe("generatePrompt fixtures", () => {
       layoutType: { display: "flex", flexDirection: "row" },
     };
     const out = generatePrompt(change, { targetTool: "claude-code" });
-    expect(out?.detailed).toContain("# Reorder within <Nav>");
+    expect(out?.detailed).toContain("# Reorder within <div.flex.gap-6.items-center>");
     expect(out?.detailed).toContain("## New child order");
     expect(out?.detailed).toContain("## Constraints");
   });
@@ -205,6 +205,69 @@ describe("generatePrompt edge cases", () => {
     expect(out?.detailed).toContain('<NavItem "Dashboard">');
   });
 
+  it("uses tag+class and child count for container moves (not descendant text)", () => {
+    const change: LayoutChange = {
+      kind: "move",
+      target: el({
+        componentName: "App",
+        tag: "div",
+        classList: ["carousel-scroll"],
+        childElementCount: 4,
+        textSnippet: "Venice, worn varnish.Wool, har",
+        contentHash: "-946342386",
+        source: { file: "src/App.tsx", line: 210, col: 0 },
+        domPath: [
+          { tag: "div", index: 0 },
+          { tag: "main", index: 1 },
+          { tag: "section", index: 2 },
+          { tag: "div", index: 1 },
+          { tag: "div", index: 0 },
+        ],
+      }),
+      fromParent: el({
+        componentName: "App",
+        tag: "div",
+        classList: ["section-widget", "carousel-widget"],
+        source: { file: "src/App.tsx", line: 207, col: 0 },
+      }),
+      toParent: el({
+        componentName: "App",
+        tag: "header",
+        classList: ["article-hero"],
+        source: { file: "src/App.tsx", line: 156, col: 0 },
+      }),
+      fromIndex: 0,
+      toIndex: 1,
+      destinationSiblings: [
+        el({
+          componentName: "App",
+          tag: "h1",
+          classList: ["display-title"],
+          textSnippet: "Meridian",
+        }),
+        el({
+          componentName: "App",
+          tag: "div",
+          classList: ["carousel-scroll"],
+          childElementCount: 4,
+          source: { file: "src/App.tsx", line: 210, col: 0 },
+        }),
+      ],
+      fromLayoutType: { display: "flex", flexDirection: "column" },
+      toLayoutType: { display: "block" },
+    };
+
+    const out = generatePrompt(change, { targetTool: "claude-code" });
+    expect(out?.short).toContain("<div.carousel-scroll> (4 element children)");
+    expect(out?.short).not.toContain("Venice, worn varnish");
+    expect(out?.short).toContain("<div.section-widget.carousel-widget>");
+    expect(out?.short).toContain("<header.article-hero>");
+    expect(out?.short).toContain("Move the entire element subtree");
+    expect(out?.short).toContain("child index 0");
+    expect(out?.detailed).toContain("**Subtree:**");
+    expect(out?.detailed).toContain("do not extract, split, or recreate children");
+  });
+
   it("returns null for same-position reorder", () => {
     const change: LayoutChange = {
       kind: "reorder",
@@ -218,9 +281,10 @@ describe("generatePrompt edge cases", () => {
     expect(generatePrompt(change, { targetTool: "claude-code" })).toBeNull();
   });
 
-  it("still includes component names in strict refs", () => {
+  it("still prefers tag+class over component name when classes exist", () => {
     const button = el({
       componentName: "Button",
+      tag: "button",
       classList: ["primary", "lg"],
     });
     const change: LayoutChange = {
@@ -233,7 +297,7 @@ describe("generatePrompt edge cases", () => {
       layoutType: { display: "flex", flexDirection: "row" },
     };
     const out = generatePrompt(change, { targetTool: "claude-code" });
-    expect(out?.short).toContain("<Button>");
+    expect(out?.short).toContain("<button.primary.lg>");
   });
 
   it("includes non-lossy source and dom anchors in short refs", () => {
@@ -323,10 +387,26 @@ describe("StyleTweak prompts", () => {
     expect(generatePrompt(empty, { targetTool: "claude-code" })).toBeNull();
   });
 
-  it("short prompt includes the component name", () => {
+  it("short prompt includes tag+class when classes are present", () => {
+    const withClasses: StyleTweak = {
+      ...baseTweak,
+      target: {
+        ...baseTweak.target,
+        tag: "figure",
+        classList: ["gallery-cell"],
+        componentName: "App",
+        source: { file: "src/App.tsx", line: 182, col: 0 },
+      },
+    };
+    const p = generatePrompt(withClasses, { targetTool: "claude-code" });
+    expect(p!.short).toContain("<figure.gallery-cell>");
+    expect(p!.short).not.toContain("<App>");
+  });
+
+  it("short prompt prefers tag+class when classes are present", () => {
     const p = generatePrompt(baseTweak, { targetTool: "claude-code" });
     expect(p).not.toBeNull();
-    expect(p!.short).toContain("Para");
+    expect(p!.short).toContain("<p.text-sm.font-normal>");
   });
 
   it("short prompt includes before and after values with arrow", () => {

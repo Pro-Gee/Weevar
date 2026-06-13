@@ -28,6 +28,8 @@ export type ElementIdentity = {
   componentName?: string;
   testId?: string;
   textSnippet?: string;
+  /** Direct element children (for container disambiguation in prompts). */
+  childElementCount?: number;
   /** True when fiber chain includes a host portal (prompts / debugging). */
   inPortal?: boolean;
 };

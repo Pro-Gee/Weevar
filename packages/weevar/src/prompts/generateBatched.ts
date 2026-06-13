@@ -102,6 +102,7 @@ export function generateBatchedPrompt(
     `---\n\n` +
     `## Global constraints\n\n` +
     `- Preserve all props on every moved element\n` +
+    `- When a move lists element children on the target, cut and paste the full subtree unchanged\n` +
     `- Don't introduce wrapper elements anywhere\n` +
     `- Don't modify any layout, spacing, or styling on the containers\n` +
     `- Apply changes strictly in the order listed. Each section's indices reflect\n` +
