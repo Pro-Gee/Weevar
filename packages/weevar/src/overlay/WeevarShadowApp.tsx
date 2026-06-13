@@ -58,6 +58,7 @@ import { weevarVersionLabel } from "../version";
 import { EditTray } from "./EditTray";
 import { OVERLAY_CSS } from "./overlayStyles";
 import { PromptPanel } from "./PromptPanel";
+import { SpacingMeasureOverlay } from "./SpacingMeasureOverlay";
 
 type FrameRects = { hover: DOMRect | null; selected: DOMRect | null };
 
@@ -428,6 +429,7 @@ export function WeevarShadowApp({
   const [toast, setToast] = useState<string | null>(null);
   const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
   const [pointerInPage, setPointerInPage] = useState(false);
+  const [altKeyHeld, setAltKeyHeld] = useState(false);
 
   const [panel, setPanel] = useState<PanelState | null>(null);
   panelRef.current = panel;
@@ -1100,6 +1102,7 @@ export function WeevarShadowApp({
       }
       setPointerInPage(true);
       setPointerPos({ x: e.clientX, y: e.clientY });
+      setAltKeyHeld(e.altKey);
       if (dragSessionRef.current) return;
       if (promptOpen) return;
       if (overChrome) {
@@ -1150,10 +1153,12 @@ export function WeevarShadowApp({
     const onWindowMouseLeave = () => {
       setPointerInPage(false);
       setPointerPos(null);
+      setAltKeyHeld(false);
     };
     const onWindowBlur = () => {
       setPointerInPage(false);
       setPointerPos(null);
+      setAltKeyHeld(false);
     };
     const onWindowMouseEnter = () => {
       setPointerInPage(true);
@@ -1166,6 +1171,7 @@ export function WeevarShadowApp({
       clearForcedCursorTarget();
       setPointerInPage(false);
       setPointerPos(null);
+      setAltKeyHeld(false);
       document.removeEventListener("pointermove", onPointerMove, {
         capture: true,
       });
@@ -1184,6 +1190,31 @@ export function WeevarShadowApp({
     promptOpen,
     setTraysDismissed,
   ]);
+
+  useEffect(() => {
+    if (!sessionOn || disabled || activeTool !== "pointer") {
+      setAltKeyHeld(false);
+      return;
+    }
+
+    const syncAlt = (held: boolean) => setAltKeyHeld(held);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Alt") syncAlt(true);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Alt") syncAlt(false);
+    };
+    const onBlur = () => syncAlt(false);
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [sessionOn, disabled, activeTool]);
 
   useEffect(() => {
     if (!(sessionOn && activeTool === "pointer")) {
@@ -1446,6 +1477,17 @@ body *:focus {
     trayAnyOpen && trayStackRef.current
       ? [trayStackRef.current.getBoundingClientRect()]
       : [];
+  const showSpacingMeasure =
+    activeTool === "pointer" &&
+    altKeyHeld &&
+    !!selectedEl &&
+    !!hoverEl &&
+    hoverEl !== selectedEl &&
+    !!frames.selected &&
+    !!frames.hover &&
+    !isDragging &&
+    !promptOpen &&
+    !pointerOverOpenTray;
   const trayStyle = useMemo((): CSSProperties => {
     const trayWidth = 250;
     const gap = 8;
@@ -2027,7 +2069,15 @@ body *:focus {
               (!selectedEl || hoverEl !== selectedEl) &&
               !isDragging &&
               !promptOpen &&
-              !pointerOverOpenTray && <Outline rect={frames.hover} variant="hover" />}
+              !pointerOverOpenTray &&
+              (!altKeyHeld || !selectedEl) && <Outline rect={frames.hover} variant="hover" />}
+
+            {showSpacingMeasure && (
+              <>
+                <Outline rect={frames.hover!} variant="hover" />
+                <SpacingMeasureOverlay from={frames.selected!} to={frames.hover!} />
+              </>
+            )}
 
             {activeTool === "pointer" && frames.selected && selectedEl && !promptOpen && (
               <>
@@ -2048,6 +2098,7 @@ body *:focus {
               hoverEl !== selectedEl &&
               !isDragging &&
               !promptOpen &&
+              !altKeyHeld &&
               pointerInPage &&
               pointerPos && (
                 <CursorHoverLabel

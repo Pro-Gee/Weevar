@@ -23,6 +23,8 @@ type NumberInputProps = {
   disabled?: boolean;
   /** Card row styling for typography fields (Figma tray). */
   variant?: "default" | "card";
+  /** Focus and enter edit mode on mount (e.g. after switching from Fill/Hug). */
+  autoFocus?: boolean;
 };
 
 export function NumberInput({
@@ -38,16 +40,29 @@ export function NumberInput({
   onCancel,
   disabled = false,
   variant = "default",
+  autoFocus = false,
 }: NumberInputProps) {
   const cardClass = variant === "card" ? " wv-number-input--card" : "";
   const [editing, setEditing] = useState(false);
   const [raw, setRaw] = useState(String(value));
   const fromRef = useRef<string>(`${value}${unit}`);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Keep display in sync when value changes externally (e.g. undo)
   useEffect(() => {
     if (!editing) setRaw(formatNumberMax2(value));
   }, [value, editing]);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    const id = requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      input.select();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [autoFocus]);
 
   const format = (n: number): string => {
     const s = formatNumberMax2(n);
@@ -122,6 +137,7 @@ export function NumberInput({
   if (!hasUnit) {
     return (
       <input
+        ref={inputRef}
         type="text"
         className={`wv-number-input wv-pe${cardClass}`}
         value={editing ? raw : format(value)}
@@ -135,6 +151,7 @@ export function NumberInput({
   return (
     <div className={`wv-number-input-wrap wv-pe${cardClass}`}>
       <input
+        ref={inputRef}
         type="text"
         className={`wv-number-input wv-pe${cardClass}`}
         value={editing ? raw : formatNumberMax2(value)}

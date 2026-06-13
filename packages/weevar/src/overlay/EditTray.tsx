@@ -19,6 +19,10 @@ import {
   supportsCssBackgroundColor,
 } from "../engine/styleEngine";
 import { roundTo2 } from "../engine/roundNumber";
+import {
+  dimensionSizingCssValue,
+  readDimensionSizingMode,
+} from "../engine/dimensionSizing";
 import type { ElementCategory } from "../engine/layoutTypes";
 import { AlignmentControl } from "./controls/AlignmentControl";
 import { BorderControl } from "./controls/BorderControl";
@@ -342,6 +346,7 @@ export function EditTray({
     (cssProperty: string, newValue: string, styleTarget?: Element) => {
       const el = styleTarget ?? element;
       (el as HTMLElement).style.setProperty(cssProperty, newValue);
+      setTick((n) => n + 1);
     },
     [element],
   );
@@ -541,6 +546,31 @@ export function EditTray({
 
   const boxWidth = readBoxDimension("width");
   const boxHeight = readBoxDimension("height");
+  const widthMode = readDimensionSizingMode(element, "width");
+  const heightMode = readDimensionSizingMode(element, "height");
+
+  const handleDimensionModeCommit = useCallback(
+    (prop: "width" | "height", mode: "fill" | "hug", displayLabel: string) => {
+      handleDeferrableFocus(prop);
+      handleCommit(prop, displayLabel, dimensionSizingCssValue(mode));
+    },
+    [handleDeferrableFocus, handleCommit],
+  );
+
+  const handleDimensionRestoreFixed = useCallback(
+    (prop: "width" | "height") => {
+      handleDeferrableFocus(prop);
+      const parsed = parseFloat(readPropertyValue(element, prop));
+      const px =
+        Number.isFinite(parsed) && parsed > 0
+          ? roundTo2(parsed)
+          : roundTo2(
+              element.getBoundingClientRect()[prop === "width" ? "width" : "height"],
+            );
+      handleChange(prop, `${px}px`);
+    },
+    [handleChange, handleDeferrableFocus, element],
+  );
 
   const svgWidth = readSvgDimension(element, "width");
   const svgHeight = readSvgDimension(element, "height");
@@ -640,6 +670,8 @@ export function EditTray({
               <DimensionControl
                 width={boxWidth}
                 height={boxHeight}
+                widthMode={widthMode}
+                heightMode={heightMode}
                 widthDisplayLabel="Box Width"
                 heightDisplayLabel="Box Height"
                 onDimensionChange={(prop, v) => handleChange(prop, v)}
@@ -647,6 +679,13 @@ export function EditTray({
                   handleCommit(prop, prop === "width" ? "Box Width" : "Box Height", v)}
                 onDimensionFocus={(prop) => handleDeferrableFocus(prop)}
                 onDimensionCancel={(prop) => revertDeferrablePreview(prop)}
+                onDimensionModeCommit={(prop, mode) =>
+                  handleDimensionModeCommit(
+                    prop,
+                    mode,
+                    prop === "width" ? "Box Width" : "Box Height",
+                  )}
+                onDimensionRestoreFixed={handleDimensionRestoreFixed}
               />
             )}
             <BoxControl
@@ -886,6 +925,7 @@ export function EditTray({
             <DimensionControl
               width={svgWidth}
               height={svgHeight}
+              sizingModes={false}
               widthDisplayLabel="SVG Width"
               heightDisplayLabel="SVG Height"
               onDimensionChange={handleSvgDimensionChange}
@@ -908,6 +948,8 @@ export function EditTray({
               <DimensionControl
                 width={boxWidth}
                 height={boxHeight}
+                widthMode={widthMode}
+                heightMode={heightMode}
                 widthDisplayLabel="Image Width"
                 heightDisplayLabel="Image Height"
                 onDimensionChange={(prop, v) => handleChange(prop, v)}
@@ -915,6 +957,13 @@ export function EditTray({
                   handleCommit(prop, prop === "width" ? "Image Width" : "Image Height", v)}
                 onDimensionFocus={(prop) => handleDeferrableFocus(prop)}
                 onDimensionCancel={(prop) => revertDeferrablePreview(prop)}
+                onDimensionModeCommit={(prop, mode) =>
+                  handleDimensionModeCommit(
+                    prop,
+                    mode,
+                    prop === "width" ? "Image Width" : "Image Height",
+                  )}
+                onDimensionRestoreFixed={handleDimensionRestoreFixed}
               />
               <CardSelectControl
                 label="Fit"
@@ -939,6 +988,8 @@ export function EditTray({
             <DimensionControl
               width={boxWidth}
               height={boxHeight}
+              widthMode={widthMode}
+              heightMode={heightMode}
               widthDisplayLabel="Box Width"
               heightDisplayLabel="Box Height"
               onDimensionChange={(prop, v) => handleChange(prop, v)}
@@ -946,6 +997,13 @@ export function EditTray({
                 handleCommit(prop, prop === "width" ? "Box Width" : "Box Height", v)}
               onDimensionFocus={(prop) => handleDeferrableFocus(prop)}
               onDimensionCancel={(prop) => revertDeferrablePreview(prop)}
+              onDimensionModeCommit={(prop, mode) =>
+                handleDimensionModeCommit(
+                  prop,
+                  mode,
+                  prop === "width" ? "Box Width" : "Box Height",
+                )}
+              onDimensionRestoreFixed={handleDimensionRestoreFixed}
             />
             <SectionDivider />
             <div className="wv-style-section wv-layout-section">

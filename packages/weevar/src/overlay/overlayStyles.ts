@@ -935,7 +935,7 @@ export const OVERLAY_CSS = `
   bottom: 20px;
   width: 250px;
   height: 340px;
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--weevar-dark, #111113);
   border: 1px solid rgba(235, 235, 235,0.04);
   padding: 8px 0 6px;
@@ -1877,6 +1877,43 @@ export const OVERLAY_CSS = `
   color: #c7c7c7;
 }
 
+/* ─── Alt-measure spacing guides (Figma-style) ─────────────────────── */
+.wv-spacing-measure {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 29;
+}
+
+.wv-spacing-line {
+  position: fixed;
+  background: #ff375f;
+  pointer-events: none;
+}
+
+.wv-spacing-line--horizontal {
+  height: 1px;
+}
+
+.wv-spacing-line--vertical {
+  width: 1px;
+}
+
+.wv-spacing-label {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #ff375f;
+  color: #fff;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* ─── V2 EditTray shell ─────────────────────────────────────────────── */
 
 .wv-edit-tray {
@@ -2325,6 +2362,57 @@ export const OVERLAY_CSS = `
 .wv-dimension-row .wv-typo-card {
   flex: 1 1 0;
   min-width: 0;
+}
+
+.wv-dimension-label-select {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.wv-dimension-label-select .wv-typo-card-label {
+  pointer-events: none;
+}
+
+.wv-dimension-label-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.wv-dimension-mode-value {
+  flex: 0 1 auto;
+  min-width: 24px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 100%;
+  color: #c7c7c7;
+  text-align: right;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wv-dimension-mode-value:hover {
+  color: #ebebeb;
 }
 
 .wv-typo-chevron {
