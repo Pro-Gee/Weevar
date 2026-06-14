@@ -26,7 +26,7 @@ Vertical dock with tool shortcuts:
 | Prompt | **P** | Generate and copy batched prompt |
 | Settings | *(icon)* | Target tool and prompt style |
 
-The tray footer shows the installed package version (e.g. `v1.1.0`).
+The tray footer shows the installed package version (e.g. `v2.0.0`).
 
 ### Overview tray
 

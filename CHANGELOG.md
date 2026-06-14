@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-22
+
+Official **semver-major** release of **Weevar V2** — layout moves and live style editing with batched AI prompts.
+
+### Added
+
+- **`docs/RELEASE_NOTES_v2.0.0.md`** — release notes for the v2.0 line.
+
+### Changed
+
+- **Version line:** `2.0.0` marks the stable V2 release (features previously shipped in 1.1.x–1.2.x).
+- **Documentation:** All current-version references updated to **v2.0.0** across README, npm README, and `docs/*`.
+- **Announcement template** updated for v2.0.0 publish.
+
+### Migration notes (1.x → 2.0.0)
+
+- **No breaking API changes** for users on 1.1.x or 1.2.x — upgrade is a version bump.
+- Users on **1.0.x** (layout-only) should review [USAGE.md](./docs/USAGE.md) for style editing and new prompt format.
+
+```bash
+npm install weevar@2.0.0
+```
+
 ## [1.2.0] - 2026-05-22
 
 Documentation and polish release following **Weevar V2 (1.1.0)**.

@@ -2,7 +2,7 @@
 
 Run this matrix before major releases or when changing overlay, edit tray, or prompt logic. Log results in the template at the bottom.
 
-**Target version:** weevar **1.1.0+** (V2)
+**Target version:** weevar **2.0.0+** (V2)
 
 ---
 

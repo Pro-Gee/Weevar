@@ -1,6 +1,6 @@
 # Security and Privacy
 
-How Weevar handles data in local development sessions (v1.1.0+).
+How Weevar handles data in local development sessions (v2.0.0+).
 
 ---
 

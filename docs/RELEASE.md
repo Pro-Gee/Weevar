@@ -1,6 +1,6 @@
 # Release Checklist
 
-Use this checklist before publishing **`weevar`** to npm. Current line: **v1.1.x** (V2 — layout + style editing).
+Use this checklist before publishing **`weevar`** to npm. Current line: **v2.0.x** (V2 — layout + style editing).
 
 ---
 

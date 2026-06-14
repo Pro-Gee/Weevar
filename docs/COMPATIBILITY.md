@@ -1,6 +1,6 @@
 # Compatibility
 
-Supported environments, integrations, and known limitations for Weevar **v1.1.0+**.
+Supported environments, integrations, and known limitations for Weevar **v2.0.0+**.
 
 ---
 
@@ -117,7 +117,8 @@ Weevar does not call external APIs; you copy prompts into your tool of choice.
 | weevar version | Session type | Change kinds |
 |----------------|--------------|--------------|
 | 1.0.x | Layout only | `reorder`, `move` |
-| 1.1.x+ | Layout + style | `reorder`, `move`, `style-tweak` |
+| 1.1.x – 1.2.x | Layout + style (pre-2.0) | `reorder`, `move`, `style-tweak` |
+| 2.0.0+ | Layout + style (current) | `reorder`, `move`, `style-tweak` |
 
 `MoveSession` type alias remains for TypeScript backward compatibility; prefer `EditSession` in new code.
 

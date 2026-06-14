@@ -4,7 +4,7 @@ A dev-only overlay for React apps that lets you **rearrange layout** and **edit 
 
 Weevar runs locally while your dev server is active. Nothing ships to production until you apply the generated prompts to your source code.
 
-**Current version:** see the tray footer (`v1.2.0` at time of this release).
+**Current version:** see the tray footer (`v2.0.0` at time of this release).
 
 ---
 
@@ -190,16 +190,18 @@ The published **`weevar/react`** production export is a **no-op** — the overla
 
 ## Documentation
 
+- [Weevar.com](https://weevar.com)
 - [Install](https://github.com/Pro-Gee/Weevar/blob/main/docs/INSTALL.md)
 - [Usage](https://github.com/Pro-Gee/Weevar/blob/main/docs/USAGE.md)
 - [Troubleshooting](https://github.com/Pro-Gee/Weevar/blob/main/docs/TROUBLESHOOTING.md)
 - [Compatibility](https://github.com/Pro-Gee/Weevar/blob/main/docs/COMPATIBILITY.md)
 - [Security](https://github.com/Pro-Gee/Weevar/blob/main/docs/SECURITY.md)
 - [Changelog](https://github.com/Pro-Gee/Weevar/blob/main/CHANGELOG.md)
-- [Weevar.com](https://weevar.com)
 
 ---
 
 ## License
 
-MIT — © 2026 Gideon Adeyemi
+MIT Licensed
+
+© 2026 Gideon Adeyemi (Weevar was created and is maintained by Gideon Adeyemi)

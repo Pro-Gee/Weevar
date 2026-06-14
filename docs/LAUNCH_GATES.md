@@ -1,6 +1,6 @@
 # Launch Gates
 
-Mandatory quality gates before tagging a public **`weevar`** release. Updated for **V2 (v1.1+)** — layout moves, style editing, and prompt reliability.
+Mandatory quality gates before tagging a public **`weevar`** release. Updated for **V2 (v2.0+)** — layout moves, style editing, and prompt reliability.
 
 ---
 

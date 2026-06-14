@@ -1,4 +1,4 @@
-# Weevar v1.1.0 Announcement Template
+# Weevar v2.0.0 Announcement Template
 
 Customize bracketed fields before publishing.
 
@@ -6,7 +6,7 @@ Customize bracketed fields before publishing.
 
 ## Headline
 
-**Weevar v1.1.0 — layout moves + live style editing, with smarter AI prompts**
+**Weevar v2.0.0 — layout moves + live style editing, with smarter AI prompts**
 
 ---
 
@@ -19,7 +19,7 @@ Customize bracketed fields before publishing.
 
 ---
 
-## What's new in v1.1.0
+## What's new in v2.0.0
 
 ### Style editing (V2)
 
@@ -46,10 +46,10 @@ Customize bracketed fields before publishing.
 ## Upgrade
 
 ```bash
-npm install weevar@1.1.0
+npm install weevar@2.0.0
 ```
 
-Rebuild your dev server. Tray footer should show **v1.1.0**.
+Rebuild your dev server. Tray footer should show **v2.0.0**.
 
 ---
 
@@ -106,8 +106,8 @@ Issues and repro steps: [github.com/Pro-Gee/Weevar/issues](https://github.com/Pr
 
 **Twitter / X (280 chars):**
 
-> Weevar v1.1 is out — rearrange layout AND edit styles in your React app, then copy one prompt for your AI editor. Smarter container moves, edit tray, Fill/Hug sizing. Dev-only, MIT. npm install weevar
+> Weevar v2 is out — rearrange layout AND edit styles in your React app, then copy one prompt for your AI editor. Smarter container moves, edit tray, Fill/Hug sizing. Dev-only, MIT. npm install weevar@2.0.0
 
 **LinkedIn (short):**
 
-> Weevar v1.1 adds live style editing alongside layout moves, with batched prompts designed for Cursor, Claude Code, and Codex. Try it in your Vite React app: npm install weevar
+> Weevar v2.0 adds live style editing alongside layout moves, with batched prompts designed for Cursor, Claude Code, and Codex. Try it in your Vite React app: npm install weevar@2.0.0

@@ -4,7 +4,7 @@ A dev-only overlay for React apps that lets you **rearrange layout** and **edit 
 
 Weevar runs locally while your dev server is active. Nothing ships to production until you apply the generated prompts to your source code.
 
-**Current version:** see the tray footer (`v1.2.0` at time of this release).
+**Current version:** see the tray footer (`v2.0.0` at time of this release).
 
 ---
 
@@ -202,4 +202,6 @@ The published **`weevar/react`** production export is a **no-op** — the overla
 
 ## License
 
-MIT — © 2026 Gideon Adeyemi
+MIT Licensed
+
+© 2026 Gideon Adeyemi (Weevar was created and is maintained by Gideon Adeyemi)

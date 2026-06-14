@@ -46,7 +46,7 @@ Common issues when installing, running, or generating prompts with Weevar V2.
 
 ## Dropdown in edit tray does not update / stay open
 
-Fixed in 1.1.0 — upgrade to latest `weevar`. If issues persist:
+Fixed in 2.0.0 (since 1.1.0) — upgrade to `weevar@2.0.0` or later. If issues persist:
 
 - Click the trigger again to close without selecting.
 - Click outside the dropdown to dismiss.
@@ -76,7 +76,7 @@ Prompts still include DOM path and content hash anchors without source lines.
 
 ## Agent misapplied a container move (moved one child instead of wrapper)
 
-Ensure you dragged the **container element** (e.g. `.carousel-scroll`), not a child slide. Prompts from 1.1.0+ label containers with `(N element children)` and subtree instructions. Paste the full batched prompt and ask the agent to apply steps in order.
+Ensure you dragged the **container element** (e.g. `.carousel-scroll`), not a child slide. Prompts from 2.0.0+ label containers with `(N element children)` and subtree instructions. Paste the full batched prompt and ask the agent to apply steps in order.
 
 ---
 
