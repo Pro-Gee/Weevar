@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { domRectsOverlap, placeCursorHoverLabel } from "./hitTest";
+import {
+  domRectsOverlap,
+  getDeepActiveElement,
+  isEditableElement,
+  placeCursorHoverLabel,
+  setWeevarClosedShadowRoot,
+  shouldIgnoreWeevarShortcut,
+  WEEVAR_HOST_ID,
+} from "./hitTest";
 
 describe("placeCursorHoverLabel", () => {
   const viewport = { width: 1440, height: 900 };
@@ -21,5 +29,30 @@ describe("placeCursorHoverLabel", () => {
   it("returns null when every candidate overlaps blocked regions", () => {
     const tray = new DOMRect(0, 0, 1440, 900);
     expect(placeCursorHoverLabel(720, 450, "div", [tray], viewport)).toBeNull();
+  });
+});
+
+describe("shouldIgnoreWeevarShortcut", () => {
+  it("ignores shortcuts when focus is inside closed Weevar shadow DOM", () => {
+    const host = document.createElement("div");
+    host.id = WEEVAR_HOST_ID;
+    document.body.appendChild(host);
+
+    const shadow = host.attachShadow({ mode: "closed" });
+    setWeevarClosedShadowRoot(shadow);
+    const input = document.createElement("input");
+    shadow.appendChild(input);
+    input.focus();
+
+    expect(document.activeElement).toBe(host);
+    expect(getDeepActiveElement()).toBe(input);
+    expect(isEditableElement(getDeepActiveElement())).toBe(true);
+
+    const event = new KeyboardEvent("keydown", { key: "w", bubbles: true, cancelable: true });
+    Object.defineProperty(event, "target", { value: host });
+    expect(shouldIgnoreWeevarShortcut(event)).toBe(true);
+
+    setWeevarClosedShadowRoot(null);
+    host.remove();
   });
 });

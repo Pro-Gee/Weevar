@@ -16,6 +16,7 @@ import {
   isInsideWeevarOverlay,
   placeCursorHoverLabel,
   pointInDOMRect,
+  shouldIgnoreWeevarShortcut,
 } from "../engine/hitTest";
 import { buildAncestorPath } from "../engine/layoutContext";
 import { buildReorderLayoutChange } from "../engine/layoutChangeFromReorder";
@@ -1593,10 +1594,8 @@ body *:focus {
     const onShortcut = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target;
-      if (t instanceof HTMLElement) {
-        if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
-      }
+      if (editSelectionTrayVisible) return;
+      if (shouldIgnoreWeevarShortcut(e)) return;
 
       const k = e.key.toLowerCase();
       if (k === "p") {
@@ -1654,6 +1653,7 @@ body *:focus {
     };
   }, [
     sessionOn,
+    editSelectionTrayVisible,
     cancelDrag,
     setSessionOn,
     generateFromBatch,

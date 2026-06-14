@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
 import {
   alphaPercentFromPickerColor,
   combineOpaqueHexAndAlphaPercent,
@@ -354,7 +354,8 @@ export function ColorPicker({
       setHexRaw(displayOpaqueHex);
       hexFieldBaselineRef.current = displayOpaqueHex.toLowerCase();
     },
-    onChange: (raw: string) => {
+    onChange: (e: ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
       setHexRaw(raw);
       if (isValidOpaqueHex(raw)) {
         onChange(
@@ -410,7 +411,8 @@ export function ColorPicker({
       setAlphaRaw(formatAlphaPercent(displayAlphaPercent));
       alphaFieldBaselineRef.current = formatAlphaPercent(displayAlphaPercent);
     },
-    onChange: (raw: string) => {
+    onChange: (e: ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
       setAlphaRaw(raw);
       const pct = parseAlphaPercentInput(raw);
       if (pct != null) {

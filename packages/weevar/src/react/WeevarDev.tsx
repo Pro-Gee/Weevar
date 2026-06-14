@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import { waitForReactHydration } from "../engine/hydration";
-import { WEEVAR_BOOT_DOT_CLASS, WEEVAR_HOST_ID } from "../engine/hitTest";
+import { WEEVAR_BOOT_DOT_CLASS, WEEVAR_HOST_ID, setWeevarClosedShadowRoot, shouldIgnoreWeevarShortcut } from "../engine/hitTest";
 import { WeevarShadowApp } from "../overlay/WeevarShadowApp";
 import type { WeevarKeybind, WeevarProps } from "../types";
 
@@ -73,6 +73,7 @@ export function Weevar(props: WeevarProps) {
         // During dev HMR/replay flows, an older Weevar instance can leave a host behind.
         // Reclaim only Weevar-owned hosts to avoid removing foreign DOM accidentally.
         if (owner.startsWith("weevar-")) {
+          setWeevarClosedShadowRoot(null);
           existingHost.remove();
         } else {
           if (import.meta.env.DEV && !warnedAboutForeignHostOwner) {
@@ -84,6 +85,7 @@ export function Weevar(props: WeevarProps) {
           return false;
         }
       } else {
+        setWeevarClosedShadowRoot(null);
         existingHost.remove();
       }
     }
@@ -96,6 +98,7 @@ export function Weevar(props: WeevarProps) {
     document.body.appendChild(host);
 
     const shadow = host.attachShadow({ mode: "closed" });
+    setWeevarClosedShadowRoot(shadow);
     const mount = document.createElement("div");
     shadow.appendChild(mount);
     const root = createRoot(mount);
@@ -140,12 +143,7 @@ export function Weevar(props: WeevarProps) {
   useEffect(() => {
     if (disabled) return;
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as Node | null;
-      if (target instanceof HTMLElement) {
-        const tag = target.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable)
-          return;
-      }
+      if (shouldIgnoreWeevarShortcut(e)) return;
       const match = keybind
         ? matchCustomKeybind(e, keybind)
         : defaultMatchKeybind(e);
@@ -169,6 +167,7 @@ export function Weevar(props: WeevarProps) {
           ownedHost &&
           ownedHost.getAttribute(WEEVAR_HOST_OWNER_ATTR) === WEEVAR_HOST_OWNER_TOKEN
         ) {
+          setWeevarClosedShadowRoot(null);
           ownedHost.remove();
         }
       }, 0);

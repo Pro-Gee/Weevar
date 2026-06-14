@@ -57,13 +57,47 @@ export function isInsideWeevarOverlay(el: Node | null): boolean {
   return false;
 }
 
-/** Deepest focused element (walks open shadow roots). */
+let weevarClosedShadowRoot: ShadowRoot | null = null;
+
+/** Registered by {@link WeevarDev} — required to resolve focus inside closed shadow DOM. */
+export function setWeevarClosedShadowRoot(root: ShadowRoot | null): void {
+  weevarClosedShadowRoot = root;
+}
+
+/** Deepest focused element (open shadow roots + Weevar closed shadow host). */
 export function getDeepActiveElement(): Element | null {
-  let active: Element | null = document.activeElement;
+  const hostActive = document.activeElement;
+  if (
+    hostActive instanceof HTMLElement &&
+    hostActive.id === WEEVAR_HOST_ID &&
+    weevarClosedShadowRoot?.activeElement
+  ) {
+    return weevarClosedShadowRoot.activeElement as Element;
+  }
+  let active: Element | null = hostActive;
   while (active?.shadowRoot?.activeElement) {
     active = active.shadowRoot.activeElement as Element;
   }
   return active;
+}
+
+/** True when the element accepts keyboard text input (tray fields, native selects, etc.). */
+export function isEditableElement(el: Element | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return el.isContentEditable;
+}
+
+/** Skip Weevar single-key shortcuts while the user is typing in any focused field. */
+export function shouldIgnoreWeevarShortcut(e: KeyboardEvent): boolean {
+  const target = e.target;
+  if (isEditableElement(target instanceof HTMLElement ? target : null)) return true;
+  if (isEditableElement(getDeepActiveElement())) return true;
+  for (const n of e.composedPath()) {
+    if (n instanceof HTMLElement && isEditableElement(n)) return true;
+  }
+  return false;
 }
 
 /**
