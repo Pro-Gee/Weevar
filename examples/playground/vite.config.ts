@@ -1,13 +1,10 @@
 import react from "@vitejs/plugin-react";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { weevar } from "weevar/vite";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
-const weevarPkgPath = path.resolve(root, "../../packages/weevar/package.json");
-const weevarVersion = JSON.parse(readFileSync(weevarPkgPath, "utf8")).version as string;
 
 /**
  * Public demo (e.g. demo.weevar.com): build with `VITE_WEEVAR_PUBLIC_DEMO=true` so theme does not
@@ -17,9 +14,6 @@ const weevarVersion = JSON.parse(readFileSync(weevarPkgPath, "utf8")).version as
  * published npm package uses `WeevarProd` (no-op) under production conditions instead.
  */
 export default defineConfig({
-  define: {
-    __WEEVAR_VERSION__: JSON.stringify(weevarVersion),
-  },
   plugins: [weevar(), react()],
   server: {
     port: 5173,

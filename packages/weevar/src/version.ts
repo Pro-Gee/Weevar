@@ -1,7 +1,7 @@
-declare const __WEEVAR_VERSION__: string;
+import pkg from "../package.json";
 
-/** Semver from `package.json`, injected at bundle time. */
-export const WEEVAR_VERSION: string = __WEEVAR_VERSION__;
+/** Semver from `package.json`. */
+export const WEEVAR_VERSION: string = pkg.version;
 
 /** Display label shown in tray footers (`v1.2.3`). */
 export function weevarVersionLabel(): string {
