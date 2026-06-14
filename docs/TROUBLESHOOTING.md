@@ -46,11 +46,29 @@ Common issues when installing, running, or generating prompts with Weevar V2.
 
 ## Dropdown in edit tray does not update / stay open
 
-Fixed in 2.0.0 (since 1.1.0) — upgrade to `weevar@2.0.0` or later. If issues persist:
+Fixed in 2.0.0 (since 1.1.0) — upgrade to `weevar@2.0.1` or later. If issues persist:
 
 - Click the trigger again to close without selecting.
 - Click outside the dropdown to dismiss.
 - Avoid interacting with the page while a menu is open unless committing a selection.
+
+---
+
+## Single-key shortcuts fire while typing in the edit tray
+
+Fixed in **2.0.1** — shortcuts are disabled while the edit tray is open. Upgrade:
+
+```bash
+npm install weevar@2.0.1
+```
+
+Restart your dev server after upgrading.
+
+---
+
+## Colour hex field won't accept typing / shows `[object Object]`
+
+Fixed in **2.0.1** — the colour picker hex input now reads typed values correctly. Upgrade to `weevar@2.0.1` and restart the dev server.
 
 ---
 

@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-06-14
+
+Bug-fix release for the V2 edit tray.
+
+### Fixed
+
+- **Edit tray keyboard shortcuts:** Single-key shortcuts (`P`, `W`, `O`, `D`, `U`, `R`) no longer fire while the edit tray is open, so typing in tray fields is not interrupted.
+- **Colour hex input:** Manual hex entry in the colour picker works again; clearing the field no longer shows `[object Object]` (React change-event handler fix).
+- **Closed shadow focus detection:** Weevar registers its closed shadow root so focus inside tray inputs is resolved correctly for shortcut suppression and blur/commit behaviour.
+
+### Added
+
+- **`docs/RELEASE_NOTES_v2.0.1.md`** — patch release notes.
+
 ## [2.0.0] - 2026-05-22
 
 Official **semver-major** release of **Weevar V2** — layout moves and live style editing with batched AI prompts.
